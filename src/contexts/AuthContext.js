@@ -35,8 +35,8 @@ export function AuthProvider({ children }) {
   const [tables, setTables] = useState([]);
   const [settings, setSettings] = useState({
     maxPeoplePerTable: 5,
-    considerLocation: false,
-    adminEmails: ['admin@timeleftegypt.com'] // Default admin email
+    considerLocation: false
+    // Note: Admin access is now controlled by user.role field ('admin' or 'super-admin')
   });
 
   // Sign in with Google
@@ -143,6 +143,7 @@ export function AuthProvider({ children }) {
           ...profileData.preferences
         },
         location: profileData.location !== undefined ? profileData.location : currentProfile.location || null,
+        role: profileData.role !== undefined ? profileData.role : currentProfile.role || '', // Preserve role field
         isAnonymous: profileData.isAnonymous !== undefined ? profileData.isAnonymous : currentProfile.isAnonymous || currentUser.isAnonymous,
         lastUpdated: new Date().toISOString(),
         createdAt: currentProfile.createdAt || new Date().toISOString()
@@ -197,9 +198,37 @@ export function AuthProvider({ children }) {
 
   // Check if current user is admin
   const isAdmin = () => {
+    console.log('🔍 Admin check:', {
+      currentUser: !!currentUser,
+      userProfile: !!userProfile,
+      userRole: userProfile?.role,
+      email: currentUser?.email,
+      userProfileData: userProfile
+    });
+    
     if (!currentUser || !userProfile) return false;
-    return settings.adminEmails.includes(currentUser.email) || 
-           settings.adminEmails.includes(userProfile.email);
+    const isAdminUser = userProfile.role === 'admin' || userProfile.role === 'super-admin';
+    console.log('🔑 Is admin:', isAdminUser);
+    return isAdminUser;
+  };
+
+  // Check if current user is super admin
+  const isSuperAdmin = () => {
+    if (!currentUser || !userProfile) return false;
+    return userProfile.role === 'super-admin';
+  };
+
+  // Temporary function to set admin role (for debugging)
+  const setAdminRole = async (role = 'admin') => {
+    if (!currentUser) return false;
+    try {
+      await updateUserProfile({ role });
+      console.log('✅ Admin role set to:', role);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to set admin role:', error);
+      return false;
+    }
   };
 
   // Load user profile from Firestore
@@ -210,6 +239,7 @@ export function AuthProvider({ children }) {
       
       if (userDoc.exists()) {
         const profile = userDoc.data();
+        console.log('📋 Loaded user profile:', profile);
         setUserProfile(profile);
         return profile;
       } else {
@@ -224,6 +254,7 @@ export function AuthProvider({ children }) {
           gender: '',
           preferences: {},
           location: null,
+          role: '', // Default role is empty (regular user)
           isAnonymous: user.isAnonymous,
           createdAt: new Date().toISOString(),
           lastUpdated: new Date().toISOString()
@@ -318,8 +349,7 @@ export function AuthProvider({ children }) {
         // Create default settings if they don't exist
         const defaultSettings = {
           maxPeoplePerTable: 5,
-          considerLocation: false,
-          adminEmails: ['admin@timeleftegypt.com']
+          considerLocation: false
         };
         try {
           await setDoc(settingsDocRef, defaultSettings);
@@ -347,6 +377,8 @@ export function AuthProvider({ children }) {
     getCurrentLocation,
     removeUserFromTable,
     isAdmin,
+    isSuperAdmin,
+    setAdminRole,
     loading
   };
 

@@ -9,8 +9,7 @@ function AdminPanel({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     maxPeoplePerTable: settings.maxPeoplePerTable || 5,
-    considerLocation: settings.considerLocation || false,
-    adminEmails: (settings.adminEmails || []).join(', ')
+    considerLocation: settings.considerLocation || false
   });
 
   // Redirect if not admin
@@ -44,11 +43,7 @@ function AdminPanel({ onBack }) {
       const newSettings = {
         ...settings,
         maxPeoplePerTable: parseInt(settingsForm.maxPeoplePerTable),
-        considerLocation: settingsForm.considerLocation,
-        adminEmails: settingsForm.adminEmails
-          .split(',')
-          .map(email => email.trim())
-          .filter(email => email.length > 0)
+        considerLocation: settingsForm.considerLocation
       };
       
       await updateSettings(newSettings);
@@ -157,6 +152,52 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  const handleResetAllUsers = async () => {
+    const action = window.prompt(
+      'Choose action:\n1. Clear tables only (users stay logged in)\n2. Clear tables and mark users for logout\n\nEnter 1 or 2:'
+    );
+
+    if (action !== '1' && action !== '2') return;
+
+    const confirmMessage = action === '1' 
+      ? 'This will clear all table assignments but keep users logged in. Continue?'
+      : 'This will clear all tables AND mark all users for logout. Users will need to sign in again. Continue?';
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      setLoading(true);
+      const batch = writeBatch(db);
+      
+      // Clear all tables
+      tables.forEach(table => {
+        const tableRef = doc(db, 'tables', table.id);
+        batch.delete(tableRef);
+      });
+      
+      // If option 2, also clear all user sessions by deleting user documents
+      if (action === '2') {
+        users.forEach(user => {
+          const userRef = doc(db, 'users', user.id);
+          batch.delete(userRef);
+        });
+      }
+      
+      await batch.commit();
+      
+      const successMessage = action === '1' 
+        ? 'All tables cleared! Users remain logged in and can request new table assignments.'
+        : 'All tables and user sessions cleared! Users will need to sign in again.';
+        
+      alert(successMessage);
+    } catch (error) {
+      console.error('Error resetting users:', error);
+      alert('Failed to reset users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const stats = getTableDistributionStats(users.length, settings.maxPeoplePerTable);
 
   return (
@@ -237,16 +278,8 @@ function AdminPanel({ onBack }) {
               </label>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="adminEmails">Admin Email Addresses (comma-separated)</label>
-              <textarea
-                id="adminEmails"
-                name="adminEmails"
-                value={settingsForm.adminEmails}
-                onChange={handleSettingsChange}
-                rows="3"
-                placeholder="admin@example.com, admin2@example.com"
-              />
+            <div className="form-note">
+              <p><strong>Note:</strong> Admin access is now controlled by user roles. Set user.role to 'admin' or 'super-admin' in Firestore to grant admin privileges.</p>
             </div>
 
             <button type="submit" className="btn-primary" disabled={loading}>
@@ -282,6 +315,15 @@ function AdminPanel({ onBack }) {
             >
               {loading ? 'Processing...' : '🗑️ Clear All Tables'}
             </button>
+            
+            <button 
+              className="btn-danger"
+              onClick={handleResetAllUsers}
+              disabled={loading}
+              style={{ backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+            >
+              {loading ? 'Processing...' : '🚪 Reset All Users'}
+            </button>
           </div>
           
           <div className="action-descriptions">
@@ -293,6 +335,9 @@ function AdminPanel({ onBack }) {
             </div>
             <div className="action-desc">
               <strong>Clear All:</strong> Removes all table assignments (users will need to get reassigned)
+            </div>
+            <div className="action-desc">
+              <strong>Reset All Users:</strong> Option to clear tables only OR clear tables and force all users to sign in again
             </div>
           </div>
         </div>

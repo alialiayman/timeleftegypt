@@ -307,10 +307,13 @@ export function AuthProvider({ children }) {
     );
     
     const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      const usersList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      console.log('👥 Users snapshot received, docs count:', snapshot.docs.length);
+      const usersList = snapshot.docs.map(doc => {
+        const userData = { id: doc.id, ...doc.data() };
+        console.log('👤 User data:', userData.displayName || userData.name, 'role:', userData.role);
+        return userData;
+      });
+      console.log('📋 Setting users state with updated data');
       setUsers(usersList);
     });
 

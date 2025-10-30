@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { shuffleTables, assignUsersToTables, getTableDistributionStats } from '../algorithms/tableAssignment';
 import { db } from '../firebase';
-import { doc, writeBatch, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, updateDoc, getDoc } from 'firebase/firestore';
 
 function AdminPanel({ onBack }) {
   const { users, tables, settings, updateSettings, isAdmin, isSuperAdmin } = useAuth();
@@ -220,15 +220,30 @@ function AdminPanel({ onBack }) {
       setLoading(true);
       
       console.log('💾 Updating Firestore document...');
-      // Update the user's role directly in Firestore using proper update
+      // Update the user's role directly in Firestore using updateDoc
       const userDocRef = doc(db, 'users', userId);
+      
+      // Check if document exists first
+      const docSnapshot = await getDoc(userDocRef);
+      if (!docSnapshot.exists()) {
+        console.error('❌ User document does not exist:', userId);
+        alert('Error: User document not found. Please try again.');
+        return;
+      }
+      
       const updateData = { 
         role: role,
         lastUpdated: new Date().toISOString()
       };
       
       console.log('📝 Update data:', updateData);
-      await setDoc(userDocRef, updateData, { merge: true });
+      console.log('📍 Document reference:', userDocRef.path);
+      console.log('📄 Current document data:', docSnapshot.data());
+      
+      // Use updateDoc instead of setDoc for better reliability
+      await updateDoc(userDocRef, updateData);
+      
+      console.log('✅ Document updated successfully');
       
       const successMessage = role === '' 
         ? 'Admin privileges removed successfully!' 

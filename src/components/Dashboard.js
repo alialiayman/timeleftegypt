@@ -12,8 +12,7 @@ function Dashboard({ setCurrentView }) {
     tables, 
     settings, 
     logout, 
-    isAdmin,
-    setAdminRole
+    isAdmin
   } = useAuth();
   
   const [myTable, setMyTable] = useState(null);
@@ -236,14 +235,6 @@ function Dashboard({ setCurrentView }) {
               onClick={handleLogout}
             >
               Logout
-            </button>
-            {/* Temporary debug button - remove after fixing admin issue */}
-            <button 
-              className="btn-secondary"
-              onClick={() => setAdminRole('admin')}
-              style={{ backgroundColor: '#28a745', borderColor: '#28a745', color: 'white' }}
-            >
-              🔧 Make Me Admin (Debug)
             </button>
           </div>
         </div>

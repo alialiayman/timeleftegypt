@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { shuffleTables, assignUsersToTables, getTableDistributionStats } from '../algorithms/tableAssignment';
 import { db } from '../firebase';
-import { doc, writeBatch } from 'firebase/firestore';
+import { doc, writeBatch, setDoc } from 'firebase/firestore';
 
 function AdminPanel({ onBack }) {
-  const { users, tables, settings, updateSettings, isAdmin } = useAuth();
+  const { users, tables, settings, updateSettings, isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     maxPeoplePerTable: settings.maxPeoplePerTable || 5,
@@ -198,6 +198,92 @@ function AdminPanel({ onBack }) {
     }
   };
 
+  // Role management functions (Super Admin only)
+  const handleSetUserRole = async (userId, role) => {
+    console.log('🔄 Attempting to set role:', { userId, role });
+    
+    if (!isSuperAdmin()) {
+      alert('Only super admins can manage user roles.');
+      return;
+    }
+
+    const user = users.find(u => u.id === userId);
+    console.log('👤 Found user:', user);
+
+    const confirmMessage = role === '' 
+      ? `Remove admin privileges from ${user?.displayName || user?.name || 'this user'}?` 
+      : `Make ${user?.displayName || user?.name || 'this user'} a ${role}?`;
+
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      setLoading(true);
+      
+      console.log('💾 Updating Firestore document...');
+      // Update the user's role directly in Firestore using proper update
+      const userDocRef = doc(db, 'users', userId);
+      const updateData = { 
+        role: role,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log('📝 Update data:', updateData);
+      await setDoc(userDocRef, updateData, { merge: true });
+      
+      const successMessage = role === '' 
+        ? 'Admin privileges removed successfully!' 
+        : `User promoted to ${role} successfully!`;
+        
+      alert(successMessage);
+      
+      // Force a refresh of the users list to see the change immediately
+      console.log('✅ Role updated successfully for user:', userId, 'to role:', role);
+    } catch (error) {
+      console.error('❌ Error updating user role:', error);
+      alert('Failed to update user role. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getUserRoleDisplay = (user) => {
+    console.log('🏷️ Display role for user:', user.displayName || user.name, 'role:', user.role);
+    if (user.role === 'super-admin') return '👑 Super Admin';
+    if (user.role === 'admin') return '🔧 Admin';
+    return user.isAnonymous ? 'Name-based' : 'Google';
+  };
+
+  const getUserRoleActions = (user) => {
+    if (!isSuperAdmin()) return null;
+    
+    // Don't show role actions for the current super admin (prevent self-demotion)
+    if (user.role === 'super-admin') return null;
+    
+    return (
+      <div className="role-actions">
+        {user.role === 'admin' ? (
+          <button
+            className="btn-small btn-warning"
+            onClick={() => handleSetUserRole(user.id, '')}
+            disabled={loading}
+            title="Remove admin privileges"
+          >
+            ⬇️ Demote
+          </button>
+        ) : (
+          <button
+            className="btn-small btn-success"
+            onClick={() => handleSetUserRole(user.id, 'admin')}
+            disabled={loading}
+            title="Make admin"
+          >
+            ⬆️ Make Admin
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const stats = getTableDistributionStats(users.length, settings.maxPeoplePerTable);
 
   return (
@@ -346,12 +432,13 @@ function AdminPanel({ onBack }) {
         <div className="admin-section">
           <h3>👥 User Management</h3>
           <div className="users-table">
-            <div className="table-header">
+            <div className={`table-header ${isSuperAdmin() ? 'super-admin' : ''}`}>
               <span>Name</span>
               <span>Email</span>
-              <span>Type</span>
+              <span>Role</span>
               <span>Table</span>
               <span>Location</span>
+              {isSuperAdmin() && <span>Actions</span>}
             </div>
             {users.map(user => {
               const userTable = tables.find(table => 
@@ -359,7 +446,7 @@ function AdminPanel({ onBack }) {
               );
               
               return (
-                <div key={user.id} className="table-row">
+                <div key={user.id} className={`table-row ${isSuperAdmin() ? 'super-admin' : ''}`}>
                   <span className="user-name">
                     {user.displayName || user.name || 'Unknown'}
                     {user.fullName && user.fullName !== user.displayName && (
@@ -367,8 +454,8 @@ function AdminPanel({ onBack }) {
                     )}
                   </span>
                   <span className="user-email">{user.email || 'No email'}</span>
-                  <span className="user-type">
-                    {user.isAnonymous ? 'Name-based' : 'Google'}
+                  <span className="user-role">
+                    {getUserRoleDisplay(user)}
                   </span>
                   <span className="user-table">
                     {userTable ? userTable.name : 'Unassigned'}
@@ -379,6 +466,11 @@ function AdminPanel({ onBack }) {
                       'No location'
                     }
                   </span>
+                  {isSuperAdmin() && (
+                    <span className="user-actions">
+                      {getUserRoleActions(user)}
+                    </span>
+                  )}
                 </div>
               );
             })}

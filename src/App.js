@@ -5,6 +5,7 @@ import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
+import LocationSelection from './components/LocationSelection';
 
 function AppContent() {
   const { currentUser, userProfile, loading, isAdmin } = useAuth();
@@ -21,6 +22,30 @@ function AppContent() {
 
   if (!currentUser) {
     return <LoginForm />;
+  }
+
+  // Wait for user profile to load before proceeding
+  if (!userProfile) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading profile...</p>
+      </div>
+    );
+  }
+
+  // Check if user needs to select a location (non-admin users without a location)
+  const needsLocationSelection = !isAdmin() && !userProfile?.currentLocationId;
+  
+  console.log('🔍 Location selection check:', {
+    isAdmin: isAdmin(),
+    userProfile: !!userProfile,
+    currentLocationId: userProfile?.currentLocationId,
+    needsLocationSelection
+  });
+  
+  if (needsLocationSelection) {
+    return <LocationSelection />;
   }
 
   const renderCurrentView = () => {
@@ -40,7 +65,7 @@ function AppContent() {
     <div className="App">
       <header className="app-header">
         <div className="header-content">
-          <h1>🍽️ Dining Table Assignment</h1>
+          <h1>⏰ TimeLeft Reconnect</h1>
           <div className="header-user">
             <span>Welcome, {userProfile?.displayName || userProfile?.name || 'User'}!</span>
             <nav className="header-nav">

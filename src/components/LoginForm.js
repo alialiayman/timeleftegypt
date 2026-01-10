@@ -23,8 +23,8 @@ function LoginForm() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>🍽️ Welcome to Dining Table Assignment</h1>
-          <p>Join other candidates and find your dining table!</p>
+          <h1>⏰ Welcome to TimeLeft Reconnect</h1>
+          <p>Join other TimeLeft members and reconnect at your table!</p>
         </div>
 
         {error && (
@@ -49,7 +49,7 @@ function LoginForm() {
 
         <div className="login-footer">
           <p>
-            Once you enter, you'll be assigned to a dining table where you can meet other candidates.
+            Once you enter, you'll be assigned to a table where you can reconnect with other TimeLeft members.
             You can update your profile and preferences later.
           </p>
         </div>

@@ -1,55 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { assignUsersToTables, moveUserBetweenTables } from '../algorithms/tableAssignment';
-import { db } from '../firebase';
-import { doc, writeBatch } from 'firebase/firestore';
 
 function Dashboard({ setCurrentView }) {
   const { 
-    currentUser, 
     userProfile, 
-    users, 
-    tables, 
-    settings, 
     logout, 
     isAdmin
   } = useAuth();
   
-  const [myTable, setMyTable] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showTableSelection, setShowTableSelection] = useState(false);
-
-  // Find current user's table
-  useEffect(() => {
-    console.log('Dashboard useEffect - currentUser:', currentUser);
-    console.log('Dashboard useEffect - tables:', tables);
-    console.log('Dashboard useEffect - users:', users);
-    console.log('Dashboard useEffect - settings:', settings);
-    console.log('Dashboard useEffect - userProfile:', userProfile);
-    
-    if (currentUser && tables.length > 0) {
-      console.log('Looking for user table for currentUser.uid:', currentUser.uid);
-      const userTable = tables.find(table => {
-        console.log('Checking table:', table);
-        return table.members && table.members.some(member => {
-          console.log('Checking member:', member, 'against uid:', currentUser.uid);
-          return member.id === currentUser.uid;
-        });
-      });
-      console.log('Found user table:', userTable);
-      setMyTable(userTable);
-    } else {
-      console.log('No currentUser or no tables available');
-      setMyTable(null);
-    }
-  }, [currentUser, tables, users, settings, userProfile]);
+  const [loading] = useState(false);
+  const [bookedEvents, setBookedEvents] = useState([]);
 
   const handleLogout = async () => {
-    const confirmMessage = myTable 
-      ? `Are you sure you want to logout?\n\nYou will be removed from ${myTable.name} and other participants will be notified.`
-      : 'Are you sure you want to logout?';
-      
-    if (window.confirm(confirmMessage)) {
+    if (window.confirm('Are you sure you want to logout?')) {
       try {
         await logout();
       } catch (error) {
@@ -59,146 +22,88 @@ function Dashboard({ setCurrentView }) {
     }
   };
 
-  const handleAssignTable = async () => {
-    console.log('handleAssignTable called');
-    console.log('currentUser:', currentUser);
-    console.log('userProfile:', userProfile);
-    
-    if (!currentUser || !userProfile) {
-      console.error('Missing currentUser or userProfile');
-      alert('Please complete your profile first before getting a table assignment.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log('Starting table assignment process');
-      
-      // Get all users including current user
-      let allUsers = users.filter(user => user.id); // Filter out any invalid users
-      console.log('Existing users from database:', allUsers);
-      
-      // Add current user if not in the users list
-      const currentUserInList = allUsers.find(user => user.id === currentUser.uid);
-      if (!currentUserInList) {
-        const currentUserData = {
-          id: currentUser.uid,
-          email: currentUser.email || '',
-          displayName: userProfile.displayName || userProfile.name || currentUser.displayName || '',
-          name: userProfile.name || userProfile.displayName || currentUser.displayName || '',
-          fullName: userProfile.fullName || '',
-          photoURL: userProfile.photoURL || currentUser.photoURL || '',
-          gender: userProfile.gender || '',
-          preferences: userProfile.preferences || {},
-          location: userProfile.location || null,
-          isAnonymous: userProfile.isAnonymous || currentUser.isAnonymous
-        };
-        allUsers.push(currentUserData);
-        console.log('Added current user to users list:', currentUserData);
-      } else {
-        console.log('Current user already in users list');
-      }
-
-      console.log('Final users list for assignment:', allUsers);
-      console.log('Current settings:', settings);
-      console.log('Existing tables:', tables);
-
-      // Test the algorithm with simple data first
-      const testUsers = [
-        { id: '1', name: 'Test User 1', displayName: 'Test User 1' },
-        { id: '2', name: 'Test User 2', displayName: 'Test User 2' },
-        { id: currentUser.uid, name: userProfile.displayName, displayName: userProfile.displayName }
-      ];
-      const testSettings = { maxPeoplePerTable: 5, considerLocation: false };
-      
-      console.log('Testing algorithm with simple data...');
-      const testTables = assignUsersToTables(testUsers, testSettings, []);
-      console.log('Algorithm test result:', testTables);
-
-      // Now try with real data
-      const newTables = assignUsersToTables(allUsers, settings, tables);
-      
-      console.log('Generated tables with real data:', newTables);
-
-      if (!newTables || newTables.length === 0) {
-        console.error('No tables generated');
-        alert('Failed to generate table assignments. Please try again.');
-        return;
-      }
-
-      // Save tables to Firebase
-      const batch = writeBatch(db);
-      
-      // Clear existing tables
-      if (tables && tables.length > 0) {
-        console.log('Clearing existing tables:', tables.length);
-        tables.forEach(table => {
-          const tableRef = doc(db, 'tables', table.id);
-          batch.delete(tableRef);
-        });
-      }
-      
-      // Create new tables
-      console.log('Creating new tables:', newTables.length);
-      newTables.forEach(table => {
-        const tableRef = doc(db, 'tables', table.id);
-        batch.set(tableRef, table);
-        console.log('Added table to batch:', table);
-      });
-      
-      await batch.commit();
-      console.log('Tables saved to Firestore successfully');
-      
-    } catch (error) {
-      console.error('Error assigning table:', error);
-      alert(`Failed to assign table: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangeTable = async (newTableId) => {
-    if (!currentUser || !myTable) return;
-
-    try {
-      setLoading(true);
-      
-      const result = moveUserBetweenTables(
-        tables, 
-        currentUser.uid, 
-        myTable.id, 
-        newTableId, 
-        settings.maxPeoplePerTable
-      );
-      
-      if (!result.success) {
-        alert(result.message);
-        return;
-      }
-      
-      // Save updated tables to Firebase
-      const batch = writeBatch(db);
-      
-      result.tables.forEach(table => {
-        const tableRef = doc(db, 'tables', table.id);
-        batch.set(tableRef, table);
-      });
-      
-      await batch.commit();
-      setShowTableSelection(false);
-      
-    } catch (error) {
-      console.error('Error changing table:', error);
-      alert('Failed to change table. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getLocationDisplay = (user) => {
-    if (!user.location) return 'Location not available';
-    return `${user.location.latitude.toFixed(3)}, ${user.location.longitude.toFixed(3)}`;
+    // Mock location for demonstration
+    return '🇪🇬 Egypt, Cairo, New Cairo';
   };
+
+  // Calculate next occurrence of a specific day
+  const getNextDayOfWeek = (dayName) => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = days.indexOf(dayName.toLowerCase());
+    
+    const today = new Date();
+    const todayDayIndex = today.getDay();
+    
+    let daysUntilTarget = dayIndex - todayDayIndex;
+    if (daysUntilTarget <= 0) {
+      daysUntilTarget += 7;
+    }
+    
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysUntilTarget);
+    
+    return targetDate;
+  };
+
+  const formatEventDate = (date) => {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  // Mock events based on user interests
+  const mockEvents = [
+    {
+      id: 'soiree-1',
+      name: 'Soirée Night',
+      interest: 'Soiree',
+      emoji: '🎭',
+      date: getNextDayOfWeek('wednesday'),
+      maxSeats: 25,
+      bookedSeats: 12,
+      description: 'An elegant evening of conversation, drinks, and networking with fellow TimeLeft members.',
+      whatsappCommunityLink: 'https://chat.whatsapp.com/soiree-community'
+    },
+    {
+      id: 'padel-1',
+      name: 'Padel Club',
+      interest: 'Padel',
+      emoji: '🎾',
+      date: getNextDayOfWeek('monday'),
+      maxSeats: 16,
+      bookedSeats: 8,
+      description: 'Join us for an exciting padel session! All skill levels welcome.',
+      whatsappCommunityLink: 'https://chat.whatsapp.com/padel-community'
+    },
+    {
+      id: 'movie-1',
+      name: 'Movie Night',
+      interest: 'Movie Night',
+      emoji: '🎬',
+      date: getNextDayOfWeek('friday'),
+      maxSeats: 30,
+      bookedSeats: 18,
+      description: 'Watch a curated film followed by discussion and refreshments.',
+      whatsappCommunityLink: 'https://chat.whatsapp.com/movie-community'
+    }
+  ];
+
+  // User's interests (from mock profile)
+  const userInterests = ['Movie Night', 'Padel', 'Soiree'];
+
+  const handleBookEvent = (eventId) => {
+    if (bookedEvents.includes(eventId)) {
+      // Unbook
+      setBookedEvents(bookedEvents.filter(id => id !== eventId));
+      alert('Event booking cancelled successfully!');
+    } else {
+      // Book
+      setBookedEvents([...bookedEvents, eventId]);
+      alert('Event booked successfully! You will receive location details 24 hours before the event.');
+    }
+  };
+
+  const isEventBooked = (eventId) => bookedEvents.includes(eventId);
 
   return (
     <div className="dashboard">
@@ -230,6 +135,14 @@ function Dashboard({ setCurrentView }) {
             >
               Edit Profile
             </button>
+            {isAdmin() && (
+              <button 
+                className="btn-primary"
+                onClick={() => setCurrentView('admin')}
+              >
+                {isAdmin() ? 'Admin Panel' : 'Admin Panel'}
+              </button>
+            )}
             <button 
               className="btn-danger"
               onClick={handleLogout}
@@ -240,176 +153,101 @@ function Dashboard({ setCurrentView }) {
         </div>
       </div>
 
-      <div className="table-assignment-section">
-        <h3>Your Table Assignment</h3>
-        
-        {!myTable ? (
-          <div className="no-table-assigned">
-            <div className="no-table-card">
-              <h4>🎲 No Table Assigned Yet</h4>
-              <p>Click the button below to get assigned to a dining table where you'll meet other candidates!</p>
-              <button 
-                className="btn-primary"
-                onClick={handleAssignTable}
-                disabled={loading}
-              >
-                {loading ? 'Assigning...' : '🍽️ Get My Table Assignment'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="table-assigned">
-            <div className="table-card">
-              <div className="table-header">
-                <h4>🍽️ {myTable.name}</h4>
-                <span className="table-occupancy">
-                  {myTable.members.length}/{settings.maxPeoplePerTable} people
-                </span>
-              </div>
-              
-              <div className="table-members">
-                <h5>Your table companions:</h5>
-                <div className="members-list">
-                  {myTable.members.map(member => (
-                    <div key={member.id} className={`member-card ${member.id === currentUser.uid ? 'current-user' : ''}`}>
-                      <div className="member-avatar">
-                        {member.photoURL ? (
-                          <img 
-                            src={member.photoURL} 
-                            alt={member.name}
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div 
-                          className="avatar-placeholder"
-                          style={{ display: member.photoURL ? 'none' : 'flex' }}
-                        >
-                          {(member.name || 'U')[0].toUpperCase()}
-                        </div>
-                      </div>
-                      <div className="member-info">
-                        <p className="member-name">
-                          {member.name}
-                          {member.id === currentUser.uid && <span className="you-badge"> (You)</span>}
-                        </p>
-                        {member.fullName && member.fullName !== member.name && (
-                          <p className="member-full-name">{member.fullName}</p>
-                        )}
-                        {member.gender && (
-                          <p className="member-gender">{member.gender}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="table-actions">
-                <button 
-                  className="btn-secondary"
-                  onClick={() => setShowTableSelection(true)}
-                  disabled={loading}
-                >
-                  Change Table
-                </button>
-                {isAdmin() && (
-                  <button 
-                    className="btn-primary"
-                    onClick={() => setCurrentView('admin')}
-                  >
-                    Admin Panel
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+      {/* User Interests Section */}
+      <div className="interests-section">
+        <h3>Your Interests</h3>
+        <div className="interests-display">
+          {userInterests.map((interest, index) => (
+            <span key={index} className="interest-badge">
+              {interest === 'Movie Night' && '🎬'}
+              {interest === 'Padel' && '🎾'}
+              {interest === 'Soiree' && '🎭'}
+              {' '}{interest}
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* Table Selection Modal */}
-      {showTableSelection && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Choose a Different Table</h3>
-              <button 
-                className="modal-close"
-                onClick={() => setShowTableSelection(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-content">
-              <div className="available-tables">
-                {tables
-                  .filter(table => table.id !== myTable?.id)
-                  .map(table => (
-                    <div key={table.id} className="table-option">
-                      <div className="table-option-header">
-                        <h4>{table.name}</h4>
-                        <span className="table-occupancy">
-                          {table.members.length}/{settings.maxPeoplePerTable}
-                        </span>
-                      </div>
-                      <div className="table-option-members">
-                        {table.members.slice(0, 3).map(member => (
-                          <span key={member.id} className="member-name-small">
-                            {member.name}
-                          </span>
-                        ))}
-                        {table.members.length > 3 && (
-                          <span className="more-members">
-                            +{table.members.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                      <button 
-                        className="btn-primary"
-                        onClick={() => handleChangeTable(table.id)}
-                        disabled={loading || table.members.length >= settings.maxPeoplePerTable}
-                      >
-                        {table.members.length >= settings.maxPeoplePerTable ? 'Full' : 'Join Table'}
-                      </button>
-                    </div>
-                  ))}
+      {/* Upcoming Events Section */}
+      <div className="events-section">
+        <h3>Upcoming Events</h3>
+        <p className="events-subtitle">Events matched to your interests</p>
+        
+        <div className="events-grid">
+          {mockEvents.map(event => (
+            <div key={event.id} className={`event-card ${isEventBooked(event.id) ? 'booked' : ''}`}>
+              <div className="event-header">
+                <div className="event-title">
+                  <span className="event-emoji">{event.emoji}</span>
+                  <h4>{event.name}</h4>
+                </div>
+                {isEventBooked(event.id) && (
+                  <span className="booked-badge">✓ Booked</span>
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* All Tables Overview */}
-      <div className="all-tables-section">
-        <h3>All Tables Overview</h3>
-        <div className="tables-grid">
-          {tables.map(table => (
-            <div key={table.id} className={`table-overview-card ${table.id === myTable?.id ? 'my-table' : ''}`}>
-              <div className="table-overview-header">
-                <h4>{table.name}</h4>
-                <span className="table-occupancy">
-                  {table.members.length}/{settings.maxPeoplePerTable}
-                </span>
-                {table.id === myTable?.id && <span className="my-table-badge">Your Table</span>}
-              </div>
-              <div className="table-overview-members">
-                {table.members.map(member => (
-                  <span key={member.id} className="member-name-overview">
-                    {member.name}
+              
+              <div className="event-details">
+                <div className="event-detail">
+                  <span className="detail-icon">📅</span>
+                  <span className="detail-text">{formatEventDate(event.date)}</span>
+                </div>
+                
+                <div className="event-detail">
+                  <span className="detail-icon">📍</span>
+                  <span className="detail-text location-tbd">
+                    Location will be announced 24 hours before the event
                   </span>
-                ))}
+                </div>
+                
+                {isAdmin() && (
+                  <div className="event-detail">
+                    <span className="detail-icon">👥</span>
+                    <span className="detail-text">
+                      {event.bookedSeats}/{event.maxSeats} seats booked
+                    </span>
+                  </div>
+                )}
               </div>
+              
+              <p className="event-description">{event.description}</p>
+              
+              <div className="event-progress">
+                <div 
+                  className="progress-bar"
+                  style={{ width: `${(event.bookedSeats / event.maxSeats) * 100}%` }}
+                />
+              </div>
+              
+              <div className="event-actions">
+                <button 
+                  className={`btn-event ${isEventBooked(event.id) ? 'btn-booked' : 'btn-book'}`}
+                  onClick={() => handleBookEvent(event.id)}
+                  disabled={loading || (!isEventBooked(event.id) && event.bookedSeats >= event.maxSeats)}
+                >
+                  {isEventBooked(event.id) 
+                    ? '✓ Cancel Booking' 
+                    : event.bookedSeats >= event.maxSeats 
+                      ? 'Event Full' 
+                      : '🎟️ Book Your Seat'}
+                </button>
+                
+                <a 
+                  href={event.whatsappCommunityLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-whatsapp"
+                >
+                  <span className="whatsapp-icon">💬</span>
+                  View Event in WhatsApp
+                </a>
+              </div>
+              
+              <p className="event-rsvp-note">
+                💡 View event details and chat with other attendees in WhatsApp
+              </p>
             </div>
           ))}
         </div>
-        
-        {tables.length === 0 && (
-          <div className="no-tables">
-            <p>No tables have been created yet. Be the first to get assigned!</p>
-          </div>
-        )}
       </div>
     </div>
   );

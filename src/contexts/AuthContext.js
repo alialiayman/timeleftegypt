@@ -14,7 +14,8 @@ import {
   collection, 
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  getDocs
 } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -33,6 +34,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [tables, setTables] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [settings, setSettings] = useState({
     maxPeoplePerTable: 5,
     considerLocation: false
@@ -73,25 +75,49 @@ export function AuthProvider({ children }) {
 
   // Sign out and remove from table
   const logout = async () => {
-    try {
-      if (currentUser) {
-        // Find and remove user from their current table
+    console.log('🚪 Starting logout process...');
+    
+    // Try to remove user from table, but don't let this block logout
+    if (currentUser) {
+      try {
+        console.log('👤 Attempting to remove user from table before logout...');
         await removeUserFromTable(currentUser.uid);
+        console.log('✅ User removed from table successfully');
+      } catch (tableError) {
+        console.warn('⚠️ Error removing user from table (continuing with logout):', tableError);
+        // Continue with logout even if table removal fails
       }
+    }
+    
+    // Always attempt to sign out, regardless of table removal success
+    try {
+      console.log('🔓 Signing out from Firebase...');
       await signOut(auth);
-    } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
+      console.log('✅ Logout completed successfully');
+    } catch (signOutError) {
+      console.error('❌ Failed to sign out:', signOutError);
+      throw signOutError;
     }
   };
 
   // Helper function to remove user from table
   const removeUserFromTable = async (userId) => {
     try {
+      // Fetch tables directly from Firestore to avoid state dependency issues
+      const tablesQuery = collection(db, 'tables');
+      const tablesSnapshot = await getDocs(tablesQuery);
+      
+      console.log('Fetching tables for user removal, found:', tablesSnapshot.docs.length, 'tables');
+      
       // Find the table that contains this user
-      const userTable = tables.find(table => 
-        table.members && table.members.some(member => member.id === userId)
-      );
+      let userTable = null;
+      for (const tableDoc of tablesSnapshot.docs) {
+        const tableData = { id: tableDoc.id, ...tableDoc.data() };
+        if (tableData.members && tableData.members.some(member => member.id === userId)) {
+          userTable = tableData;
+          break;
+        }
+      }
 
       if (userTable) {
         console.log('Removing user from table:', userTable.name);
@@ -105,14 +131,16 @@ export function AuthProvider({ children }) {
           await deleteDoc(tableRef);
           console.log('Deleted empty table:', userTable.name);
         } else {
-          // Update table with remaining members
+          // Update table with remaining members - use merge to avoid overwriting
           const tableRef = doc(db, 'tables', userTable.id);
           await setDoc(tableRef, {
-            ...userTable,
-            members: updatedMembers
-          });
+            members: updatedMembers,
+            lastUpdated: new Date().toISOString()
+          }, { merge: true });
           console.log('Updated table with remaining members:', updatedMembers.length);
         }
+      } else {
+        console.log('User not found in any table');
       }
     } catch (error) {
       console.error('Error removing user from table:', error);
@@ -122,13 +150,21 @@ export function AuthProvider({ children }) {
 
   // Update user profile in Firestore
   const updateUserProfile = async (profileData) => {
-    if (!currentUser) return;
+    console.log('🔄 updateUserProfile called with:', profileData);
+    console.log('👤 currentUser:', !!currentUser, currentUser?.uid);
+    console.log('👤 current userProfile state:', userProfile);
+    
+    if (!currentUser) {
+      console.error('❌ No currentUser in updateUserProfile');
+      return;
+    }
 
     try {
       const userDocRef = doc(db, 'users', currentUser.uid);
       
       // Get current profile for proper merging
       const currentProfile = userProfile || {};
+      console.log('📋 Using currentProfile for merge:', currentProfile);
       
       const updatedProfile = {
         id: currentUser.uid,
@@ -136,6 +172,7 @@ export function AuthProvider({ children }) {
         displayName: profileData.displayName || currentProfile.displayName || currentUser.displayName || '',
         name: profileData.name || profileData.displayName || currentProfile.name || currentUser.displayName || '',
         fullName: profileData.fullName || currentProfile.fullName || '',
+        city: profileData.city !== undefined ? profileData.city : currentProfile.city || '',
         photoURL: profileData.photoURL || currentProfile.photoURL || currentUser.photoURL || '',
         gender: profileData.gender !== undefined ? profileData.gender : currentProfile.gender || '',
         preferences: {
@@ -143,19 +180,26 @@ export function AuthProvider({ children }) {
           ...profileData.preferences
         },
         location: profileData.location !== undefined ? profileData.location : currentProfile.location || null,
+        currentLocationId: profileData.currentLocationId !== undefined ? profileData.currentLocationId : currentProfile.currentLocationId || null,
+        checkedInAt: profileData.checkedInAt !== undefined ? profileData.checkedInAt : currentProfile.checkedInAt || null,
         role: profileData.role !== undefined ? profileData.role : currentProfile.role || '', // Preserve role field
         isAnonymous: profileData.isAnonymous !== undefined ? profileData.isAnonymous : currentProfile.isAnonymous || currentUser.isAnonymous,
         lastUpdated: new Date().toISOString(),
         createdAt: currentProfile.createdAt || new Date().toISOString()
       };
 
-      console.log('Updating profile with data:', updatedProfile);
+      console.log('💾 About to save profile to Firestore:', updatedProfile);
       
       await setDoc(userDocRef, updatedProfile, { merge: true });
+      console.log('✅ Profile saved to Firestore successfully');
+      
       setUserProfile(updatedProfile);
+      console.log('✅ Local userProfile state updated');
+      
       return updatedProfile;
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      console.error('❌ Error updating user profile:', error);
+      console.error('❌ Error details:', error.message, error.code);
       throw error;
     }
   };
@@ -192,6 +236,110 @@ export function AuthProvider({ children }) {
       return true;
     } catch (error) {
       console.error('Error updating settings:', error);
+      throw error;
+    }
+  };
+
+  // Location management functions (admin only)
+  const addLocation = async (locationData) => {
+    if (!isAdmin()) {
+      throw new Error('Only admins can add locations');
+    }
+
+    try {
+      const locationId = `location_${Date.now()}`;
+      const locationRef = doc(db, 'locations', locationId);
+      const newLocation = {
+        id: locationId,
+        name: locationData.name,
+        googleMapsLink: locationData.googleMapsLink,
+        description: locationData.description || '',
+        expectedTime: locationData.expectedTime || '',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser.uid
+      };
+
+      await setDoc(locationRef, newLocation);
+      console.log('✅ Location added successfully:', newLocation);
+      return newLocation;
+    } catch (error) {
+      console.error('Error adding location:', error);
+      throw error;
+    }
+  };
+
+  const updateLocation = async (locationId, locationData) => {
+    if (!isAdmin()) {
+      throw new Error('Only admins can update locations');
+    }
+
+    try {
+      const locationRef = doc(db, 'locations', locationId);
+      const updateData = {
+        ...locationData,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser.uid
+      };
+
+      await setDoc(locationRef, updateData, { merge: true });
+      console.log('✅ Location updated successfully');
+      return true;
+    } catch (error) {
+      console.error('Error updating location:', error);
+      throw error;
+    }
+  };
+
+  const deleteLocation = async (locationId) => {
+    if (!isAdmin()) {
+      throw new Error('Only admins can delete locations');
+    }
+
+    try {
+      const locationRef = doc(db, 'locations', locationId);
+      await deleteDoc(locationRef);
+      console.log('✅ Location deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      throw error;
+    }
+  };
+
+  // User check-in to location
+  const checkInToLocation = async (locationId) => {
+    console.log('🏢 checkInToLocation called with:', locationId);
+    console.log('👤 currentUser:', !!currentUser, currentUser?.uid);
+    console.log('👤 userProfile before check-in:', userProfile);
+    
+    if (!currentUser) {
+      console.error('❌ No current user found');
+      return false;
+    }
+
+    try {
+      console.log('🔄 Starting location change process...');
+      
+      // If user is changing locations, remove them from current table first
+      if (userProfile?.currentLocationId && userProfile.currentLocationId !== locationId) {
+        console.log('🚚 User changing locations, removing from current table...');
+        await removeUserFromTable(currentUser.uid);
+      }
+      
+      const updatedProfile = await updateUserProfile({ 
+        currentLocationId: locationId,
+        checkedInAt: new Date().toISOString()
+      });
+      
+      console.log('✅ Profile update completed successfully');
+      console.log('👤 Updated user profile:', updatedProfile);
+      console.log('📍 currentLocationId set to:', updatedProfile.currentLocationId);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error checking in to location:', error);
+      console.error('❌ Error details:', error.message, error.code);
       throw error;
     }
   };
@@ -250,6 +398,7 @@ export function AuthProvider({ children }) {
           displayName: user.displayName || '',
           name: user.displayName || '',
           fullName: '',
+          city: '',
           photoURL: user.photoURL || '',
           gender: '',
           preferences: {},
@@ -299,6 +448,26 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  // Listen to current user's profile changes in real-time
+  useEffect(() => {
+    if (!currentUser) return;
+
+    console.log('👤 Setting up real-time listener for user profile:', currentUser.uid);
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    
+    const unsubscribe = onSnapshot(userDocRef, (doc) => {
+      if (doc.exists()) {
+        const profileData = doc.data();
+        console.log('👤 User profile updated from Firestore:', profileData);
+        setUserProfile(profileData);
+      }
+    }, (error) => {
+      console.error('Error listening to user profile:', error);
+    });
+
+    return unsubscribe;
+  }, [currentUser]);
+
   // Listen to all users
   useEffect(() => {
     const usersQuery = query(
@@ -315,6 +484,27 @@ export function AuthProvider({ children }) {
       });
       console.log('📋 Setting users state with updated data');
       setUsers(usersList);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Listen to locations
+  useEffect(() => {
+    console.log('Setting up locations listener...');
+    const locationsQuery = collection(db, 'locations');
+    
+    const unsubscribe = onSnapshot(locationsQuery, (snapshot) => {
+      console.log('📍 Locations snapshot received, docs count:', snapshot.docs.length);
+      const locationsList = snapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        console.log('🏢 Location:', data.name, 'active:', data.isActive);
+        return data;
+      });
+      console.log('📋 Setting locations state:', locationsList);
+      setLocations(locationsList);
+    }, (error) => {
+      console.error('Error listening to locations:', error);
     });
 
     return unsubscribe;
@@ -371,12 +561,17 @@ export function AuthProvider({ children }) {
     userProfile,
     users,
     tables,
+    locations,
     settings,
     signInWithGoogle,
     signInWithName,
     logout,
     updateUserProfile,
     updateSettings,
+    addLocation,
+    updateLocation,
+    deleteLocation,
+    checkInToLocation,
     getCurrentLocation,
     removeUserFromTable,
     isAdmin,

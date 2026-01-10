@@ -1,6 +1,6 @@
-# 🍽️ Dining Table Assignment System
+# ⏰ TimeLeft Reconnect
 
-A modern web application for automatically assigning candidates to dining tables for networking events. Built with React and Firebase, this system helps organize small to medium-sized gatherings (2-25 people) by intelligently distributing participants across tables.
+A modern web application for automatically assigning TimeLeft members to tables for reconnection events. Built with React and Firebase, this system helps organize small to medium-sized gatherings (2-25 people) by intelligently distributing participants across tables.
 
 ## ✨ Features
 
@@ -12,7 +12,7 @@ A modern web application for automatically assigning candidates to dining tables
 ### 🎲 Smart Table Assignment
 - **Automatic Assignment**: Intelligent algorithm distributes users evenly across tables
 - **Configurable Table Size**: Admin can set maximum people per table (default: 5)
-- **Location-Aware**: Optional location-based grouping for better networking
+- **Location-Aware**: Optional location-based grouping for better reconnection
 - **Round-Robin Distribution**: Ensures balanced table assignments
 
 ### 👤 User Profiles
@@ -303,7 +303,7 @@ For support and questions:
 - **QR Code Check-in**: Quick mobile access
 - **Table Chat**: In-app messaging between table members
 - **Event Templates**: Predefined configurations for different event types
-- **Analytics Dashboard**: Detailed insights on networking patterns
+- **Analytics Dashboard**: Detailed insights on reconnection patterns
 - **Integration APIs**: Connect with event management platforms
 - **Multi-language Support**: Internationalization
 - **Advanced Matching**: AI-powered compatibility matching
@@ -357,4 +357,4 @@ You don't have to ever use `eject`. The curated feature set is suitable for smal
 
 ---
 
-Built with ❤️ for better networking experiences.
+Built with ❤️ for better reconnection experiences.

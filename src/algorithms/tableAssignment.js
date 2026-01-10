@@ -74,16 +74,14 @@ function assignRoundRobin(users, tables, maxPeoplePerTable) {
 }
 
 /**
- * Assignment considering geographical location
+ * Assignment considering restaurant location ID
  */
 function assignByLocation(users, tables, maxPeoplePerTable) {
-  // Group users by location (simplified - could be more sophisticated)
+  // Group users by their currentLocationId
   const locationGroups = {};
   
   for (const user of users) {
-    const locationKey = user.location ? 
-      `${Math.round(user.location.latitude * 100)}-${Math.round(user.location.longitude * 100)}` : 
-      'unknown';
+    const locationKey = user.currentLocationId || 'no-location';
     
     if (!locationGroups[locationKey]) {
       locationGroups[locationKey] = [];
@@ -91,11 +89,26 @@ function assignByLocation(users, tables, maxPeoplePerTable) {
     locationGroups[locationKey].push(user);
   }
   
+  console.log('👥 Grouping users by location:', locationGroups);
+  
   const result = [...tables];
   
-  // Assign users from each location group
-  for (const [, locationUsers] of Object.entries(locationGroups)) {
-    result.push(...assignRoundRobin(locationUsers, [], maxPeoplePerTable));
+  // Assign users from each location group separately
+  for (const [locationId, locationUsers] of Object.entries(locationGroups)) {
+    console.log(`🏢 Processing location ${locationId} with ${locationUsers.length} users`);
+    
+    // Create tables for this specific location
+    const locationTables = assignRoundRobin(locationUsers, [], maxPeoplePerTable);
+    
+    // Add location identifier to table names
+    const locationName = locationId === 'no-location' ? 'General' : `Location-${locationId.split('_')[1]}`;
+    locationTables.forEach((table, index) => {
+      table.locationId = locationId;
+      table.name = `${locationName} - Table ${index + 1}`;
+      table.id = `${locationId}_table_${index + 1}_${Date.now()}`;
+    });
+    
+    result.push(...locationTables);
   }
   
   return result;

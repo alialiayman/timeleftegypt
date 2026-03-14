@@ -56,11 +56,9 @@ Consider:
  * @returns {string} The formatted prompt
  */
 export function buildSchedulingPrompt(attendees, constraints = {}) {
-  const {
-    targetGroupSize = 10,
-    maxGroups = Math.ceil(attendees.length / targetGroupSize),
-    locationLimit = targetGroupSize,
-  } = constraints;
+  const targetGroupSize = constraints.targetGroupSize ?? 10;
+  const maxGroups = constraints.maxGroups ?? Math.ceil(attendees.length / targetGroupSize);
+  const locationLimit = constraints.locationLimit ?? targetGroupSize;
 
   const attendeeSummaries = attendees.map(a => ({
     id: a.id,

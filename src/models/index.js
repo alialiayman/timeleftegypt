@@ -4,28 +4,23 @@
  */
 
 /**
- * @typedef {Object} UserRole
- * @type {'super_admin' | 'event_admin' | 'friend'}
+ * @typedef {'super_admin' | 'event_admin' | 'friend'} UserRole
  */
 
 /**
- * @typedef {Object} LocationStatus
- * @type {'pending' | 'approved' | 'blocked'}
+ * @typedef {'pending' | 'approved' | 'blocked'} LocationStatus
  */
 
 /**
- * @typedef {Object} BookingStatus
- * @type {'pending' | 'confirmed' | 'cancelled'}
+ * @typedef {'pending' | 'confirmed' | 'cancelled'} BookingStatus
  */
 
 /**
- * @typedef {Object} RatingValue
- * @type {'like_a_lot' | 'like_a_little' | 'not_at_all'}
+ * @typedef {'like_a_lot' | 'like_a_little' | 'not_at_all'} RatingValue
  */
 
 /**
- * @typedef {Object} EventType
- * @type {'dinner' | 'breakfast' | 'lunch' | 'movie_night' | 'paddle' | 'soiree' | 'coffee_meetup' | 'library_meetup'}
+ * @typedef {'dinner' | 'breakfast' | 'lunch' | 'movie_night' | 'paddle' | 'soiree' | 'coffee_meetup' | 'library_meetup'} EventType
  */
 
 /** All supported event types */

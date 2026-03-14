@@ -104,7 +104,7 @@ const resources = {
   ar: {
     translation: {
       // App
-      appName: 'جاذيرلي',
+      appName: 'غاذرلي',
       loading: 'جارٍ التحميل...',
       loadingProfile: 'جارٍ تحميل الملف الشخصي...',
       welcome: 'أهلاً، {{name}}!',

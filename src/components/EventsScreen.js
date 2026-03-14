@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, doc, where
+  addDoc, updateDoc, doc, where, increment, arrayUnion, arrayRemove, runTransaction
 } from 'firebase/firestore';
 import { EVENT_TYPES, BOOKING_STATUS, createEvent, createBooking } from '../models';
 
@@ -77,14 +77,13 @@ export default function EventsScreen() {
 
   const handleBookEvent = async (event) => {
     if (!currentUser) return;
+    const existing = myBookings[event.id];
+    if (existing && existing.status === BOOKING_STATUS.CONFIRMED) {
+      showMessage('Already booked! ✅');
+      return;
+    }
     setBookingLoading(event.id);
     try {
-      const existing = myBookings[event.id];
-      if (existing && existing.status !== BOOKING_STATUS.CANCELLED) {
-        showMessage(t('bookingSuccess'));
-        return;
-      }
-
       const bookingData = createBooking({
         userId: currentUser.uid,
         eventId: event.id,
@@ -95,18 +94,31 @@ export default function EventsScreen() {
       });
       delete bookingData.id;
 
-      await addDoc(collection(db, 'bookings'), bookingData);
-
-      await updateDoc(doc(db, 'events', event.id), {
-        currentAttendees: (event.currentAttendees || 0) + 1,
-        attendeeIds: [...(event.attendeeIds || []), currentUser.uid],
-        lastUpdated: new Date().toISOString(),
+      // Use Firestore transaction for atomic capacity check + increment
+      await runTransaction(db, async (transaction) => {
+        const eventRef = doc(db, 'events', event.id);
+        const eventSnap = await transaction.get(eventRef);
+        if (!eventSnap.exists()) throw new Error('Event not found');
+        const data = eventSnap.data();
+        const current = data.currentAttendees || 0;
+        const max = data.maxAttendees || 0;
+        if (current >= max) throw new Error('Event is fully booked');
+        transaction.update(eventRef, {
+          currentAttendees: increment(1),
+          attendeeIds: arrayUnion(currentUser.uid),
+          lastUpdated: new Date().toISOString(),
+        });
       });
 
+      await addDoc(collection(db, 'bookings'), bookingData);
       showMessage(t('bookingSuccess'));
     } catch (err) {
       console.error('Booking error:', err);
-      showMessage(t('errorBooking'));
+      if (err.message === 'Event is fully booked') {
+        showMessage(t('fullyBooked'));
+      } else {
+        showMessage(t('errorBooking'));
+      }
     } finally {
       setBookingLoading(null);
     }
@@ -121,9 +133,10 @@ export default function EventsScreen() {
         status: BOOKING_STATUS.CANCELLED,
         lastUpdated: new Date().toISOString(),
       });
+      // Use atomic decrement and array remove to avoid race conditions
       await updateDoc(doc(db, 'events', event.id), {
-        currentAttendees: Math.max(0, (event.currentAttendees || 1) - 1),
-        attendeeIds: (event.attendeeIds || []).filter(id => id !== currentUser.uid),
+        currentAttendees: increment(-1),
+        attendeeIds: arrayRemove(currentUser.uid),
         lastUpdated: new Date().toISOString(),
       });
       showMessage(t('bookingCancel'));

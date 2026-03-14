@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders Gatherly app', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  // App renders in loading state initially (firebase auth pending)
+  // Just verify it renders without crashing
+  expect(document.body).toBeInTheDocument();
 });

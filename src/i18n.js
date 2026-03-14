@@ -99,6 +99,105 @@ const resources = {
       errorAuth: 'Authentication failed.',
       errorBooking: 'Booking failed.',
       submitRatings: 'Submit Ratings',
+
+      // Landing Page — Navigation
+      navFeatures: 'Features',
+      navAbout: 'About',
+      navPricing: 'Pricing',
+      navLogin: 'Login',
+
+      // Landing Page — Hero
+      heroHeadline: 'Meet Better. More Often.',
+      heroSubtitle: 'Gatherly helps you and your friends meet regularly through curated social events. From dinners and movie nights to coffee meetups and paddle games — we organize the details so you can focus on the experience.',
+      heroCTA: 'Join Gatherly Free',
+      heroLoginCTA: 'Already have an account? Sign in',
+
+      // Landing Page — How It Works
+      howItWorksTitle: 'How It Works',
+      howItWorksStep1Title: 'Create an Event',
+      howItWorksStep1Desc: 'Set up a social event — dinner, movie night, coffee meetup, or any experience you love.',
+      howItWorksStep2Title: 'People RSVP',
+      howItWorksStep2Desc: 'Friends and members respond to attend. No chasing, no group chat chaos.',
+      howItWorksStep3Title: 'Smart Grouping',
+      howItWorksStep3Desc: 'Our AI arranges attendees into compatible groups, ensuring great chemistry at every table.',
+      howItWorksStep4Title: 'Show Up & Enjoy',
+      howItWorksStep4Desc: 'Just arrive and connect. We handle logistics, seating, and every detail.',
+      howItWorksAINote: "Our AI respects compatibility — it avoids pairing people who don't click, and gets smarter with every event to deliver better experiences over time.",
+
+      // Landing Page — Why Gatherly
+      whyGatherlyTitle: 'Why Gatherly?',
+      whyProblem1Title: 'Organizing is exhausting',
+      whyProblem1Desc: 'Manual coordination, endless group chats, uncertain attendance — it kills the social energy before it even starts.',
+      whyProblem2Title: 'Attendance is unpredictable',
+      whyProblem2Desc: 'People drop out last minute, groups become unbalanced, and the experience suffers.',
+      whyProblem3Title: 'Group dynamics are tricky',
+      whyProblem3Desc: 'Not everyone clicks. Pairing incompatible people creates awkward, forgettable experiences.',
+      whySolution: 'Gatherly solves all of this with structure, smart scheduling, and a compatibility engine that improves with every event.',
+
+      // Landing Page — Features
+      featuresTitle: 'Everything You Need to Connect',
+      feature1Title: 'Event Creation',
+      feature1Desc: 'Create and manage social events with all the details — date, venue, capacity, and pricing.',
+      feature2Title: 'Smart Scheduling',
+      feature2Desc: 'AI-powered scheduling that respects compatibility and avoids awkward pairings.',
+      feature3Title: 'RSVP & Attendance',
+      feature3Desc: 'Simple booking flow with confirmation tracking and gentle reminders.',
+      feature4Title: 'Social Discovery',
+      feature4Desc: 'Find events and people that match your interests and social vibe.',
+      feature5Title: 'Compatibility Matching',
+      feature5Desc: 'Our algorithm learns your preferences and improves groupings with every event.',
+      feature6Title: 'Safe Contacts',
+      feature6Desc: 'Exchange contact info only with mutual consent — privacy first.',
+
+      // Landing Page — Use Cases
+      useCasesTitle: 'Perfect For Every Occasion',
+      useCase1: 'Dinner Parties',
+      useCase2: 'Movie Nights',
+      useCase3: 'Coffee Meetups',
+      useCase4: 'Paddle Games',
+      useCase5: 'Soirées',
+      useCase6: 'Library Meetups',
+
+      // Landing Page — Value Proposition
+      valuePropTitle: 'Your Social Life, Upgraded',
+      valuePropDesc: 'Meeting people regularly is one of the most important things you can do for your happiness and growth. Gatherly exists to make that effortless — managing the logistics, improving compatibility, and removing the awkwardness so you can focus on what matters: genuine human connection.',
+      valuePropPoint1: 'We manage every logistical detail',
+      valuePropPoint2: 'We improve compatibility over time',
+      valuePropPoint3: 'We remove social friction and awkwardness',
+      valuePropPoint4: 'We help you build lasting connections',
+      valueStat1: 'Real Connections Made',
+      valueStat2: 'Smart Compatibility',
+      valueStat3: 'Memorable Experiences',
+
+      // Landing Page — Pricing
+      pricingTitle: 'Simple, Transparent Pricing',
+      pricingFreeTitle: 'Free',
+      pricingFreePrice: '$0',
+      pricingFreePeriod: 'forever',
+      pricingFreeDesc: 'Get started with basic social discovery',
+      pricingFreeFeature1: 'Browse public events',
+      pricingFreeFeature2: 'Limited RSVPs per month',
+      pricingFreeFeature3: 'Basic profile',
+      pricingFreeFeature4: 'Community access',
+      pricingFreeCTA: 'Start Free',
+      pricingProTitle: 'Member',
+      pricingProPrice: 'Contact Us',
+      pricingProPeriod: 'flexible',
+      pricingProDesc: 'Full access to all Gatherly features',
+      pricingProFeature1: 'Unlimited event access',
+      pricingProFeature2: 'Smart group matching',
+      pricingProFeature3: 'RSVP + booking management',
+      pricingProFeature4: 'Compatibility insights',
+      pricingProFeature5: 'Priority support',
+      pricingProCTA: 'Get Full Access',
+      pricingProBadge: 'Most Popular',
+
+      // Landing Page — Footer
+      footerTagline: 'Bringing people together through curated social experiences.',
+      footerContact: 'Contact Us',
+      footerWhatsApp: 'WhatsApp',
+      footerLinks: 'Quick Links',
+      footerCopyright: '© 2025 Gatherly. All rights reserved.',
     }
   },
   ar: {
@@ -198,6 +297,105 @@ const resources = {
       errorAuth: 'فشل التحقق من الهوية.',
       errorBooking: 'فشل الحجز.',
       submitRatings: 'إرسال التقييمات',
+
+      // Landing Page — Navigation
+      navFeatures: 'المميزات',
+      navAbout: 'عن التطبيق',
+      navPricing: 'الأسعار',
+      navLogin: 'تسجيل الدخول',
+
+      // Landing Page — Hero
+      heroHeadline: 'تواصل أفضل. أكثر تواتراً.',
+      heroSubtitle: 'غاذرلي يساعدك أنت وأصدقاءك على الالتقاء بانتظام من خلال فعاليات اجتماعية منظمة. من حفلات العشاء وليالي السينما إلى لقاءات القهوة وألعاب البادل — نحن نتولى التفاصيل حتى تتفرغ للتجربة.',
+      heroCTA: 'انضم مجاناً',
+      heroLoginCTA: 'لديك حساب؟ سجّل دخولك',
+
+      // Landing Page — How It Works
+      howItWorksTitle: 'كيف يعمل',
+      howItWorksStep1Title: 'أنشئ فعالية',
+      howItWorksStep1Desc: 'ضع فعالية اجتماعية — عشاء، ليلة سينما، لقاء قهوة، أو أي تجربة تحبها.',
+      howItWorksStep2Title: 'الأشخاص يتجاوبون',
+      howItWorksStep2Desc: 'الأصدقاء والأعضاء يردون للحضور. لا متابعة، لا فوضى في المجموعات.',
+      howItWorksStep3Title: 'تجميع ذكي',
+      howItWorksStep3Desc: 'يرتب الذكاء الاصطناعي الحاضرين في مجموعات متوافقة لضمان كيمياء رائعة على كل طاولة.',
+      howItWorksStep4Title: 'احضر واستمتع',
+      howItWorksStep4Desc: 'فقط تعال وتواصل. نتولى نحن اللوجستيات والجلوس وكل التفاصيل.',
+      howItWorksAINote: 'يراعي ذكاؤنا الاصطناعي التوافق — يتجنب إقران أشخاص لا ينسجمون، ويتطور مع كل فعالية لتقديم تجارب أفضل.',
+
+      // Landing Page — Why Gatherly
+      whyGatherlyTitle: 'لماذا غاذرلي؟',
+      whyProblem1Title: 'التنظيم مرهق',
+      whyProblem1Desc: 'التنسيق اليدوي، المحادثات اللانهائية، الحضور غير المؤكد — كل هذا يقتل الطاقة الاجتماعية قبل أن تبدأ.',
+      whyProblem2Title: 'الحضور غير متوقع',
+      whyProblem2Desc: 'الناس ينسحبون في اللحظة الأخيرة، تصبح المجموعات غير متوازنة، وتعاني التجربة.',
+      whyProblem3Title: 'ديناميكيات المجموعة صعبة',
+      whyProblem3Desc: 'ليس الجميع يتناسق. إقران أشخاص غير متوافقين يخلق تجارب محرجة لا تُنسى للأسف الشديد.',
+      whySolution: 'غاذرلي يحل كل هذا بالبنية الصحيحة، والجدولة الذكية، ومحرك التوافق الذي يتحسن مع كل فعالية.',
+
+      // Landing Page — Features
+      featuresTitle: 'كل ما تحتاجه للتواصل',
+      feature1Title: 'إنشاء الفعاليات',
+      feature1Desc: 'أنشئ وأدر الفعاليات الاجتماعية بكل التفاصيل — التاريخ، المكان، الطاقة الاستيعابية، والتسعير.',
+      feature2Title: 'الجدولة الذكية',
+      feature2Desc: 'جدولة بالذكاء الاصطناعي تراعي التوافق وتتجنب الإقرانات المحرجة.',
+      feature3Title: 'التسجيل والحضور',
+      feature3Desc: 'تدفق حجز بسيط مع تتبع التأكيد والتذكيرات اللطيفة.',
+      feature4Title: 'الاكتشاف الاجتماعي',
+      feature4Desc: 'اعثر على فعاليات وأشخاص يتناسبون مع اهتماماتك وطاقتك الاجتماعية.',
+      feature5Title: 'مطابقة التوافق',
+      feature5Desc: 'تتعلم خوارزميتنا تفضيلاتك وتحسّن التجميعات مع كل فعالية.',
+      feature6Title: 'جهات الاتصال الآمنة',
+      feature6Desc: 'تبادل معلومات الاتصال بموافقة متبادلة فقط — الخصوصية أولاً.',
+
+      // Landing Page — Use Cases
+      useCasesTitle: 'مثالي لكل مناسبة',
+      useCase1: 'حفلات العشاء',
+      useCase2: 'ليالي السينما',
+      useCase3: 'لقاءات القهوة',
+      useCase4: 'ألعاب البادل',
+      useCase5: 'السهرات',
+      useCase6: 'لقاءات المكتبة',
+
+      // Landing Page — Value Proposition
+      valuePropTitle: 'حياتك الاجتماعية، بمستوى أعلى',
+      valuePropDesc: 'لقاء الناس بانتظام هو من أهم الأشياء التي يمكنك القيام بها لسعادتك ونموك. غاذرلي موجود لجعل ذلك سهلاً — يدير اللوجستيات، ويحسّن التوافق، ويزيل الإحراج حتى تتركز على ما يهم: التواصل الإنساني الحقيقي.',
+      valuePropPoint1: 'نتولى كل تفصيلة لوجستية',
+      valuePropPoint2: 'نحسّن التوافق مع الوقت',
+      valuePropPoint3: 'نزيل الاحتكاك الاجتماعي والإحراج',
+      valuePropPoint4: 'نساعدك على بناء علاقات دائمة',
+      valueStat1: 'علاقات حقيقية',
+      valueStat2: 'توافق ذكي',
+      valueStat3: 'تجارب لا تُنسى',
+
+      // Landing Page — Pricing
+      pricingTitle: 'تسعير بسيط وشفاف',
+      pricingFreeTitle: 'مجاني',
+      pricingFreePrice: '$0',
+      pricingFreePeriod: 'للأبد',
+      pricingFreeDesc: 'ابدأ باكتشاف اجتماعي أساسي',
+      pricingFreeFeature1: 'تصفح الفعاليات العامة',
+      pricingFreeFeature2: 'حجوزات محدودة شهرياً',
+      pricingFreeFeature3: 'ملف شخصي أساسي',
+      pricingFreeFeature4: 'وصول للمجتمع',
+      pricingFreeCTA: 'ابدأ مجاناً',
+      pricingProTitle: 'عضو',
+      pricingProPrice: 'تواصل معنا',
+      pricingProPeriod: 'مرن',
+      pricingProDesc: 'وصول كامل لجميع ميزات غاذرلي',
+      pricingProFeature1: 'وصول غير محدود للفعاليات',
+      pricingProFeature2: 'مطابقة ذكية للمجموعات',
+      pricingProFeature3: 'إدارة الحجز والحضور',
+      pricingProFeature4: 'رؤى التوافق',
+      pricingProFeature5: 'دعم متميز',
+      pricingProCTA: 'احصل على الوصول الكامل',
+      pricingProBadge: 'الأكثر شيوعاً',
+
+      // Landing Page — Footer
+      footerTagline: 'نجمع الناس من خلال تجارب اجتماعية منظمة.',
+      footerContact: 'تواصل معنا',
+      footerWhatsApp: 'واتساب',
+      footerLinks: 'روابط سريعة',
+      footerCopyright: '© 2025 غاذرلي. جميع الحقوق محفوظة.',
     }
   }
 };

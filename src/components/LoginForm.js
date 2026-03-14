@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
 function LoginForm() {
   const { signInWithGoogle } = useAuth();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -11,9 +13,9 @@ function LoginForm() {
       setLoading(true);
       setError('');
       await signInWithGoogle();
-    } catch (error) {
-      console.error('Error signing in:', error);
-      setError('Failed to sign in with Google. Please try again.');
+    } catch (err) {
+      console.error('Error signing in:', err);
+      setError(t('errorAuth'));
     } finally {
       setLoading(false);
     }
@@ -23,8 +25,8 @@ function LoginForm() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>⏰ Welcome to TimeLeft Reconnect</h1>
-          <p>Join other TimeLeft members and reconnect at your table!</p>
+          <h1>🌟 {t('appName')}</h1>
+          <p>{t('signInTagline')}</p>
         </div>
 
         {error && (
@@ -35,23 +37,15 @@ function LoginForm() {
 
         <div className="login-options">
           <div className="login-option">
-            <h3>Sign in with Google</h3>
-            <p>Use your Google account for a personalized experience</p>
-            <button 
+            <h3>{t('signIn')}</h3>
+            <button
               className="google-signin-btn"
               onClick={handleGoogleSignIn}
               disabled={loading}
             >
-              {loading ? 'Signing in...' : '🔐 Sign in with Google'}
+              {loading ? t('loading') : `🔐 ${t('signInWithGoogle')}`}
             </button>
           </div>
-        </div>
-
-        <div className="login-footer">
-          <p>
-            Once you enter, you'll be assigned to a table where you can reconnect with other TimeLeft members.
-            You can update your profile and preferences later.
-          </p>
         </div>
       </div>
     </div>

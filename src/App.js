@@ -1,21 +1,32 @@
 import React, { useState } from 'react';
 import './App.css';
+import './i18n';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
 import LocationSelection from './components/LocationSelection';
+import EventsScreen from './components/EventsScreen';
 
 function AppContent() {
   const { currentUser, userProfile, loading, isAdmin } = useAuth();
+  const { t, i18n } = useTranslation();
   const [currentView, setCurrentView] = useState('dashboard');
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'ar' : 'en';
+    i18n.changeLanguage(newLang);
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = newLang;
+  };
 
   if (loading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading...</p>
+        <p>{t('loading')}</p>
       </div>
     );
   }
@@ -24,26 +35,17 @@ function AppContent() {
     return <LoginForm />;
   }
 
-  // Wait for user profile to load before proceeding
   if (!userProfile) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading profile...</p>
+        <p>{t('loadingProfile')}</p>
       </div>
     );
   }
 
-  // Check if user needs to select a location (non-admin users without a location)
   const needsLocationSelection = !isAdmin() && !userProfile?.currentLocationId;
-  
-  console.log('🔍 Location selection check:', {
-    isAdmin: isAdmin(),
-    userProfile: !!userProfile,
-    currentLocationId: userProfile?.currentLocationId,
-    needsLocationSelection
-  });
-  
+
   if (needsLocationSelection) {
     return <LocationSelection />;
   }
@@ -53,9 +55,11 @@ function AppContent() {
       case 'profile':
         return <UserProfile onBack={() => setCurrentView('dashboard')} />;
       case 'admin':
-        return isAdmin() ? 
+        return isAdmin() ?
           <AdminPanel onBack={() => setCurrentView('dashboard')} /> :
           <Dashboard setCurrentView={setCurrentView} />;
+      case 'events':
+        return <EventsScreen setCurrentView={setCurrentView} />;
       default:
         return <Dashboard setCurrentView={setCurrentView} />;
     }
@@ -65,35 +69,44 @@ function AppContent() {
     <div className="App">
       <header className="app-header">
         <div className="header-content">
-          <h1>⏰ TimeLeft Reconnect</h1>
+          <h1>🌟 {t('appName')}</h1>
           <div className="header-user">
-            <span>Welcome, {userProfile?.displayName || userProfile?.name || 'User'}!</span>
+            <span>{t('welcome', { name: userProfile?.displayName || userProfile?.name || 'User' })}</span>
             <nav className="header-nav">
-              <button 
+              <button
                 className={`nav-btn ${currentView === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setCurrentView('dashboard')}
               >
-                Dashboard
+                {t('dashboard')}
               </button>
-              <button 
+              <button
+                className={`nav-btn ${currentView === 'events' ? 'active' : ''}`}
+                onClick={() => setCurrentView('events')}
+              >
+                {t('events')}
+              </button>
+              <button
                 className={`nav-btn ${currentView === 'profile' ? 'active' : ''}`}
                 onClick={() => setCurrentView('profile')}
               >
-                Profile
+                {t('profile')}
               </button>
               {isAdmin() && (
-                <button 
+                <button
                   className={`nav-btn ${currentView === 'admin' ? 'active' : ''}`}
                   onClick={() => setCurrentView('admin')}
                 >
-                  Admin
+                  {t('admin')}
                 </button>
               )}
+              <button className="nav-btn lang-btn" onClick={toggleLanguage}>
+                {i18n.language === 'en' ? 'عربي' : 'EN'}
+              </button>
             </nav>
           </div>
         </div>
       </header>
-      
+
       <main className="app-main">
         {renderCurrentView()}
       </main>
@@ -110,3 +123,4 @@ function App() {
 }
 
 export default App;
+

@@ -1,64 +1,206 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { storage } from '../firebase';
+import { db, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  collection, query, where, onSnapshot, addDoc, updateDoc, doc,
+  getDocs, orderBy, documentId
+} from 'firebase/firestore';
+
+const ALL_INTERESTS = [
+  '🎬 Movie Night', '🎾 Padel', '✨ Soirée', '🍽️ Dinner',
+  '☕ Coffee Meetup', '📚 Library Meetup', '🏓 Paddle',
+  '🎮 Gaming', '🎨 Art', '🏃 Sports', '🎵 Music', '🍳 Cooking', '✈️ Travel',
+];
 
 function UserProfile({ onBack }) {
-  const { userProfile, updateUserProfile } = useAuth();
+  const { t } = useTranslation();
+  const { currentUser, userProfile, updateUserProfile } = useAuth();
+
   const [formData, setFormData] = useState({
     displayName: '',
     fullName: '',
     phoneNumber: '',
-    city: '',
     gender: '',
+    localityId: '',
     preferences: {
       dietary: '',
-      interests: '',
-      experience: ''
-    }
+      interests: [],
+      experience: '',
+    },
   });
+
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [isPhoneVerified, setIsPhoneVerified] = useState(true); // Mock: assume verified
-  const [blockedMembers, setBlockedMembers] = useState([]);
-  const [showBlockMemberModal, setShowBlockMemberModal] = useState(false);
-  const [searchMemberQuery, setSearchMemberQuery] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
   const fileInputRef = useRef(null);
 
-  // Mock members list for blocking
-  const mockMembers = [
-    { id: 1, name: 'Ahmed Hassan', phone: '+20 100 123 4567' },
-    { id: 2, name: 'Sara Mohamed', phone: '+20 101 234 5678' },
-    { id: 3, name: 'Omar Ali', phone: '+20 102 345 6789' },
-    { id: 4, name: 'Layla Ibrahim', phone: '+20 103 456 7890' },
-    { id: 5, name: 'Youssef Khaled', phone: '+20 104 567 8901' },
-    { id: 6, name: 'Nour Ahmed', phone: '+20 105 678 9012' },
-    { id: 7, name: 'Karim Mansour', phone: '+20 106 789 0123' },
-    { id: 8, name: 'Dina Samir', phone: '+20 107 890 1234' },
-    { id: 9, name: 'Hossam Fathy', phone: '+20 108 901 2345' },
-    { id: 10, name: 'Mona Tarek', phone: '+20 109 012 3456' }
-  ];
+  // Localities from Firestore
+  const [localities, setLocalities] = useState([]);
 
-  // Initialize form data when userProfile changes
+  // Met people / ratings
+  const [metPeople, setMetPeople] = useState([]);
+  const [ratingsGiven, setRatingsGiven] = useState({});
+  const [ratingLoading, setRatingLoading] = useState(null);
+  const [ratingMessages, setRatingMessages] = useState({});
+
+  // Contact permissions
+  const [contactRequests, setContactRequests] = useState({});
+  const [contactLoading, setContactLoading] = useState(null);
+
+  // Account status / appeals
+  const [appealText, setAppealText] = useState('');
+  const [appealStatus, setAppealStatus] = useState(null);
+  const [appealLoading, setAppealLoading] = useState(false);
+  const [showAppealForm, setShowAppealForm] = useState(false);
+
+  // Load localities
+  useEffect(() => {
+    const q = query(collection(db, 'localities'), orderBy('country'));
+    const unsub = onSnapshot(q, (snap) => {
+      setLocalities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {});
+    return unsub;
+  }, []);
+
+  // Initialize form from profile
   useEffect(() => {
     if (userProfile) {
+      const rawInterests = userProfile.preferences?.interests;
+      const interestsArr = Array.isArray(rawInterests)
+        ? rawInterests
+        : typeof rawInterests === 'string' && rawInterests.trim()
+          ? rawInterests.split(',').map(s => s.trim()).filter(Boolean)
+          : [];
+
       setFormData({
         displayName: userProfile.displayName || '',
         fullName: userProfile.fullName || '',
         phoneNumber: userProfile.phoneNumber || '',
-        city: userProfile.city || '',
         gender: userProfile.gender || '',
+        localityId: userProfile.localityId || '',
         preferences: {
           dietary: userProfile.preferences?.dietary || '',
-          interests: userProfile.preferences?.interests || '',
+          interests: interestsArr,
           experience: userProfile.preferences?.experience || '',
-          ...userProfile.preferences
-        }
+        },
       });
-      // Mock: set verification status based on whether phone exists
-      setIsPhoneVerified(userProfile.phoneVerified || Boolean(userProfile.phoneNumber));
     }
   }, [userProfile]);
+
+  // Load met people: users who attended the same events as current user
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const loadMetPeople = async () => {
+      try {
+        // Get all confirmed bookings for current user
+        const myBookingsSnap = await getDocs(
+          query(
+            collection(db, 'bookings'),
+            where('userId', '==', currentUser.uid),
+            where('status', '==', 'confirmed')
+          )
+        );
+        const myEventIds = myBookingsSnap.docs.map(d => d.data().eventId);
+        if (myEventIds.length === 0) return;
+
+        // Get all bookings for those events (batched in groups of 10 for Firestore 'in' limit)
+        const metUserIds = new Set();
+        for (let i = 0; i < myEventIds.length; i += 10) {
+          const batch = myEventIds.slice(i, i + 10);
+          const othersSnap = await getDocs(
+            query(
+              collection(db, 'bookings'),
+              where('eventId', 'in', batch),
+              where('status', '==', 'confirmed')
+            )
+          );
+          othersSnap.docs.forEach(d => {
+            const uid = d.data().userId;
+            if (uid !== currentUser.uid) metUserIds.add(uid);
+          });
+        }
+
+        if (metUserIds.size === 0) return;
+
+        // Load user profiles for met people
+        const metIds = Array.from(metUserIds);
+        const profilePromises = [];
+        for (let i = 0; i < metIds.length; i += 10) {
+          const batch = metIds.slice(i, i + 10);
+          profilePromises.push(
+            getDocs(query(collection(db, 'users'), where(documentId(), 'in', batch)))
+          );
+        }
+        const profileSnaps = await Promise.all(profilePromises);
+        const people = [];
+        profileSnaps.forEach(snap => {
+          snap.docs.forEach(d => people.push({ id: d.id, ...d.data() }));
+        });
+        setMetPeople(people);
+      } catch (err) {
+        console.error('Error loading met people:', err);
+      }
+    };
+
+    loadMetPeople();
+  }, [currentUser]);
+
+  // Load ratings given by current user
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'ratings'),
+      where('fromUserId', '==', currentUser.uid)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const map = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        map[data.toUserId] = { id: d.id, ...data };
+      });
+      setRatingsGiven(map);
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
+
+  // Load contact permission requests sent by current user
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'contactPermissions'),
+      where('requesterId', '==', currentUser.uid)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const map = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        map[data.targetUserId] = { id: d.id, ...data };
+      });
+      setContactRequests(map);
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
+
+  // Load appeal status
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'appeals'),
+      where('userId', '==', currentUser.uid)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const latest = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.createdAt > a.createdAt ? -1 : 1))[0];
+        setAppealStatus(latest);
+      }
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -66,54 +208,43 @@ function UserProfile({ onBack }) {
       const prefKey = name.split('.')[1];
       setFormData(prev => ({
         ...prev,
-        preferences: {
-          ...prev.preferences,
-          [prefKey]: value
-        }
+        preferences: { ...prev.preferences, [prefKey]: value },
       }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
+  };
+
+  const toggleInterest = (interest) => {
+    setFormData(prev => {
+      const current = prev.preferences.interests;
+      const updated = current.includes(interest)
+        ? current.filter(i => i !== interest)
+        : [...current, interest];
+      return { ...prev, preferences: { ...prev.preferences, interests: updated } };
+    });
   };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      alert(t('errorGeneral'));
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      alert(t('errorGeneral'));
       return;
     }
-
     try {
       setUploadingPhoto(true);
-      
-      // Create a reference to the file in Firebase Storage
       const fileRef = ref(storage, `profile-photos/${userProfile.id}/${Date.now()}-${file.name}`);
-      
-      // Upload the file
       const snapshot = await uploadBytes(fileRef, file);
-      
-      // Get the download URL
       const photoURL = await getDownloadURL(snapshot.ref);
-      
-      // Update user profile with new photo URL
       await updateUserProfile({ photoURL });
-      
-      alert('Photo uploaded successfully!');
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Failed to upload photo. Please try again.');
+      alert(t('errorGeneral'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -123,87 +254,127 @@ function UserProfile({ onBack }) {
     e.preventDefault();
     try {
       setLoading(true);
-      
-      // Prepare the data for submission
-      const profileUpdate = {
+
+      // Resolve locality label
+      let localityLabel = '';
+      if (formData.localityId) {
+        const loc = localities.find(l => l.id === formData.localityId);
+        if (loc) localityLabel = `${loc.country} → ${loc.city} → ${loc.area}`;
+      }
+
+      await updateUserProfile({
         displayName: formData.displayName.trim(),
         fullName: formData.fullName.trim(),
+        phoneNumber: formData.phoneNumber,
         gender: formData.gender,
+        localityId: formData.localityId,
+        localityLabel,
         preferences: {
           dietary: formData.preferences.dietary,
-          interests: formData.preferences.interests.trim(),
-          experience: formData.preferences.experience.trim()
-        }
-      };
-
-      console.log('Submitting profile data:', profileUpdate);
-      
-      await updateUserProfile(profileUpdate);
-      alert('Profile updated successfully!');
+          interests: formData.preferences.interests,
+          experience: formData.preferences.experience.trim(),
+        },
+      });
+      setSaveMessage(t('profileSaved'));
+      setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
+      alert(t('errorGeneral'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyPhone = () => {
-    // Mock verification - in production, this would send an SMS
-    if (formData.phoneNumber && formData.phoneNumber.length >= 10) {
-      const code = prompt('Verification code sent to ' + formData.phoneNumber + '\n\nFor demo: Enter "1234" to verify');
-      if (code === '1234') {
-        setIsPhoneVerified(true);
-        alert('Phone number verified successfully!');
-        // In production, update the profile with verified phone
-      } else if (code) {
-        alert('Invalid verification code. Please try again.');
+  const handleSubmitRating = async (toUserId, starValue) => {
+    if (!currentUser) return;
+    setRatingLoading(toUserId);
+    try {
+      const existing = ratingsGiven[toUserId];
+      const ratingData = {
+        fromUserId: currentUser.uid,
+        toUserId,
+        numericRating: starValue,
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      };
+      if (existing) {
+        await updateDoc(doc(db, 'ratings', existing.id), {
+          numericRating: starValue,
+          lastUpdated: new Date().toISOString(),
+        });
+      } else {
+        await addDoc(collection(db, 'ratings'), ratingData);
       }
-    } else {
-      alert('Please enter a valid phone number');
+      const person = metPeople.find(p => p.id === toUserId);
+      setRatingMessages(prev => ({
+        ...prev,
+        [toUserId]: t('ratingSubmittedFor', { name: person?.displayName || person?.name || toUserId }),
+      }));
+      setTimeout(() => {
+        setRatingMessages(prev => { const n = { ...prev }; delete n[toUserId]; return n; });
+      }, 3000);
+    } catch (err) {
+      console.error('Rating error:', err);
+    } finally {
+      setRatingLoading(null);
     }
   };
 
-  const handleWhatsAppMessage = () => {
-    const phone = formData.phoneNumber.replace(/[^0-9]/g, '');
-    const message = encodeURIComponent('Hello! This is a message from TimeLeft Reconnect.');
-    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-  };
-
-  const handleBlockMember = (member) => {
-    if (window.confirm(`Are you sure you want to block ${member.name}? You will not be matched with them in any events.`)) {
-      setBlockedMembers([...blockedMembers, member]);
-      alert(`${member.name} has been blocked. You won't meet them in any events.`);
-      setShowBlockMemberModal(false);
-      setSearchMemberQuery('');
+  const handleConnectRequest = async (targetUserId) => {
+    if (!currentUser) return;
+    setContactLoading(targetUserId);
+    try {
+      await addDoc(collection(db, 'contactPermissions'), {
+        requesterId: currentUser.uid,
+        targetUserId,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        reviewedAt: null,
+      });
+    } catch (err) {
+      console.error('Connect request error:', err);
+    } finally {
+      setContactLoading(null);
     }
   };
 
-  const handleUnblockMember = (memberId) => {
-    const member = blockedMembers.find(m => m.id === memberId);
-    if (window.confirm(`Unblock ${member?.name}? They will be able to attend events with you again.`)) {
-      setBlockedMembers(blockedMembers.filter(m => m.id !== memberId));
-      alert(`${member?.name} has been unblocked.`);
+  const handleSubmitAppeal = async (e) => {
+    e.preventDefault();
+    if (!appealText.trim() || !currentUser) return;
+    try {
+      setAppealLoading(true);
+      await addDoc(collection(db, 'appeals'), {
+        userId: currentUser.uid,
+        message: appealText.trim(),
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        reviewedBy: null,
+        reviewedAt: null,
+      });
+      setAppealText('');
+      setShowAppealForm(false);
+    } catch (err) {
+      console.error('Appeal error:', err);
+    } finally {
+      setAppealLoading(false);
     }
   };
 
-  const getFilteredMembers = () => {
-    const blocked = new Set(blockedMembers.map(m => m.id));
-    return mockMembers
-      .filter(m => !blocked.has(m.id))
-      .filter(m => searchMemberQuery === '' || 
-        m.name.toLowerCase().includes(searchMemberQuery.toLowerCase()) ||
-        m.phone.includes(searchMemberQuery)
-      );
-  };
+  const starDescriptions = [
+    t('star1Desc'),
+    t('star2Desc'),
+    t('star3Desc'),
+    t('star4Desc'),
+    t('star5Desc'),
+  ];
 
   return (
     <div className="user-profile">
       <div className="profile-header">
         <button className="back-btn" onClick={onBack}>
-          ← Back to Dashboard
+          ← {t('dashboard')}
         </button>
-        <h2>My Profile</h2>
+        <h2>{t('editProfile')}</h2>
       </div>
 
       <div className="profile-content">
@@ -218,7 +389,6 @@ function UserProfile({ onBack }) {
               </div>
             )}
           </div>
-          
           <div className="photo-upload">
             <input
               type="file"
@@ -227,24 +397,25 @@ function UserProfile({ onBack }) {
               accept="image/*"
               style={{ display: 'none' }}
             />
-            <button 
+            <button
               type="button"
               className="btn-secondary"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPhoto}
             >
-              {uploadingPhoto ? 'Uploading...' : '📷 Change Photo'}
+              {uploadingPhoto ? '...' : '📷 ' + t('editProfile')}
             </button>
           </div>
         </div>
 
         {/* Profile Form */}
         <form onSubmit={handleSubmit} className="profile-form">
+          {/* Basic Information */}
           <div className="form-section">
-            <h3>Basic Information</h3>
-            
+            <h3>📋 {t('displayName')}</h3>
+
             <div className="form-group">
-              <label htmlFor="displayName">Display Name *</label>
+              <label htmlFor="displayName">{t('displayName')} *</label>
               <input
                 type="text"
                 id="displayName"
@@ -257,7 +428,7 @@ function UserProfile({ onBack }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="fullName">Full Name</label>
+              <label htmlFor="fullName">{t('fullName')}</label>
               <input
                 type="text"
                 id="fullName"
@@ -265,123 +436,64 @@ function UserProfile({ onBack }) {
                 value={formData.fullName}
                 onChange={handleInputChange}
                 maxLength={100}
-                placeholder="Your complete name"
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="phoneNumber">
-                Phone Number * 
-                {isPhoneVerified && <span className="verified-badge">✅ Verified</span>}
-              </label>
-              <div className="phone-input-group">
-                <input
-                  type="tel"
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  disabled={isPhoneVerified}
-                  required
-                  maxLength={20}
-                  placeholder="+20 123 456 7890"
-                  className={isPhoneVerified ? 'verified' : ''}
-                />
-                <button
-                  type="button"
-                  className="btn-verify"
-                  onClick={handleVerifyPhone}
-                  disabled={isPhoneVerified}
-                >
-                  {isPhoneVerified ? '✓ Verified' : 'Verify'}
-                </button>
-                {isPhoneVerified && (
-                  <button
-                    type="button"
-                    className="btn-whatsapp"
-                    onClick={handleWhatsAppMessage}
-                    title="Send WhatsApp message"
-                  >
-                    💬 WhatsApp
-                  </button>
-                )}
-              </div>
-              <small>
-                {isPhoneVerified 
-                  ? '🔒 Your phone number is verified and secured. Contact support to change it.' 
-                  : 'Enter your phone number and verify it to secure your account'}
-              </small>
+              <label htmlFor="phoneNumber">{t('phone')}</label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                maxLength={20}
+                placeholder="+20 123 456 7890"
+              />
             </div>
 
             <div className="form-group">
-              <label htmlFor="gender">Gender</label>
+              <label htmlFor="gender">{t('gender')}</label>
               <select
                 id="gender"
                 name="gender"
                 value={formData.gender}
                 onChange={handleInputChange}
               >
-                <option value="">Prefer not to say</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+                <option value="">—</option>
+                <option value="male">Male / ذكر</option>
+                <option value="female">Female / أنثى</option>
               </select>
             </div>
           </div>
 
+          {/* Locality */}
           <div className="form-section">
-            <h3>Location Information</h3>
+            <h3>📍 {t('locality')}</h3>
             <div className="form-group">
-              <label htmlFor="country">Country</label>
+              <label htmlFor="localityId">{t('localitySelect')}</label>
               <select
-                id="country"
-                name="country"
-                value="egypt"
-                disabled
+                id="localityId"
+                name="localityId"
+                value={formData.localityId}
+                onChange={handleInputChange}
               >
-                <option value="">Select country</option>
-                <option value="egypt">🇪🇬 Egypt</option>
-                <option value="usa">🇺🇸 United States</option>
-                <option value="uk">🇬🇧 United Kingdom</option>
+                <option value="">— {t('localitySelect')} —</option>
+                {localities.map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.country} → {loc.city} → {loc.area}
+                  </option>
+                ))}
               </select>
             </div>
-            
-            <div className="form-group">
-              <label htmlFor="city">City</label>
-              <select
-                id="city"
-                name="city"
-                value="cairo"
-                disabled
-              >
-                <option value="">Select city</option>
-                <option value="cairo">Cairo</option>
-                <option value="alexandria">Alexandria</option>
-                <option value="giza">Giza</option>
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="area">Area</label>
-              <select
-                id="area"
-                name="area"
-                value="new-cairo"
-                disabled
-              >
-                <option value="">Select area</option>
-                <option value="downtown">Downtown</option>
-                <option value="new-cairo">New Cairo</option>
-                <option value="6th-october">6th October</option>
-              </select>
-            </div>
-            <small className="mock-note">📍 Currently showing: Egypt → Cairo → New Cairo (Mock Data)</small>
           </div>
 
+          {/* Preferences & Interests */}
           <div className="form-section">
-            <h3>Preferences & Interests</h3>
-            
+            <h3>❤️ {t('interests')}</h3>
+
             <div className="form-group">
-              <label htmlFor="preferences.dietary">Dietary Preferences</label>
+              <label>{t('dietary')}</label>
               <select
                 id="preferences.dietary"
                 name="preferences.dietary"
@@ -401,186 +513,186 @@ function UserProfile({ onBack }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="preferences.interests">Interests & Activities</label>
+              <label>{t('interests')}</label>
               <div className="interests-tags">
-                <span className="interest-tag selected">🎬 Movie Night</span>
-                <span className="interest-tag selected">🎾 Padel</span>
-                <span className="interest-tag selected">🎭 Soiree</span>
-                <span className="interest-tag">🎮 Gaming</span>
-                <span className="interest-tag">🎨 Art</span>
-                <span className="interest-tag">📚 Reading</span>
-                <span className="interest-tag">🏃 Sports</span>
-                <span className="interest-tag">🎵 Music</span>
-                <span className="interest-tag">🍳 Cooking</span>
-                <span className="interest-tag">✈️ Travel</span>
+                {ALL_INTERESTS.map(interest => (
+                  <span
+                    key={interest}
+                    className={`interest-tag ${formData.preferences.interests.includes(interest) ? 'selected' : ''}`}
+                    onClick={() => toggleInterest(interest)}
+                  >
+                    {interest}
+                  </span>
+                ))}
               </div>
-              <small className="mock-note">✨ Mock selection: Movie Night, Padel, Soiree</small>
             </div>
 
             <div className="form-group">
-              <label htmlFor="preferences.experience">Professional Experience</label>
+              <label htmlFor="preferences.experience">{t('experience')}</label>
+              <small className="field-note">{t('experienceNote')}</small>
               <textarea
                 id="preferences.experience"
                 name="preferences.experience"
                 value={formData.preferences.experience}
                 onChange={handleInputChange}
-                rows="3"
-                maxLength={300}
-                placeholder="Brief description of your professional background or field of work..."
+                rows={3}
+                maxLength={500}
+                placeholder="e.g. Software engineer, doctor, educator..."
               />
             </div>
           </div>
 
+          {saveMessage && <p className="save-success-msg">{saveMessage}</p>}
+
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onBack}>
-              Cancel
+              {t('eventCancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Updating...' : 'Save Profile'}
+              {loading ? '...' : t('saveProfile')}
             </button>
           </div>
         </form>
 
-        {/* Blocked Members Section */}
-        <div className="blocked-members-section">
-          <div className="section-header">
-            <h3>🚫 Blocked Members</h3>
-            <button 
-              type="button" 
-              className="btn-small btn-primary"
-              onClick={() => setShowBlockMemberModal(true)}
-            >
-              ➕ Block a Member
-            </button>
-          </div>
-          
-          {blockedMembers.length === 0 ? (
-            <div className="no-blocked-members">
-              <p>You haven't blocked any members yet.</p>
-              <small>Blocking a member ensures you won't be matched with them in any events.</small>
-            </div>
+        {/* Met People & Ratings */}
+        <div className="met-people-section">
+          <h3>🤝 {t('metPeople')}</h3>
+          {metPeople.length === 0 ? (
+            <p className="empty-state-text">{t('metPeopleEmpty')}</p>
           ) : (
-            <div className="blocked-members-list">
-              {blockedMembers.map(member => (
-                <div key={member.id} className="blocked-member-item">
-                  <div className="member-info">
-                    <div className="member-avatar">
-                      {member.name[0].toUpperCase()}
+            <div className="met-people-list">
+              {metPeople.map(person => {
+                const existingRating = ratingsGiven[person.id];
+                const contactReq = contactRequests[person.id];
+
+                return (
+                  <div key={person.id} className="met-person-card">
+                    <div className="person-info">
+                      <div className="person-avatar">
+                        {person.photoURL
+                          ? <img src={person.photoURL} alt="" />
+                          : (person.displayName || person.name || '?')[0].toUpperCase()
+                        }
+                      </div>
+                      <div className="person-details">
+                        <strong>{person.displayName || person.name}</strong>
+                        {person.localityLabel && (
+                          <small>📍 {person.localityLabel}</small>
+                        )}
+                      </div>
                     </div>
-                    <div className="member-details">
-                      <strong>{member.name}</strong>
-                      <small>{member.phone}</small>
+
+                    {/* Star Rating */}
+                    <div className="star-rating-row">
+                      <span className="rating-label">{t('ratePerson')}:</span>
+                      <div className="stars">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <button
+                            key={star}
+                            type="button"
+                            className={`star-btn ${(existingRating?.numericRating || 0) >= star ? 'star-filled' : ''}`}
+                            onClick={() => handleSubmitRating(person.id, star)}
+                            disabled={ratingLoading === person.id}
+                            title={starDescriptions[star - 1]}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                      {ratingMessages[person.id] && (
+                        <span className="rating-saved-msg">{ratingMessages[person.id]}</span>
+                      )}
+                    </div>
+
+                    {/* Connect Request */}
+                    <div className="connect-row">
+                      {contactReq ? (
+                        <span className={`connect-status connect-${contactReq.status}`}>
+                          {contactReq.status === 'approved'
+                            ? t('connectRequestApproved')
+                            : contactReq.status === 'rejected'
+                              ? '✗ Declined'
+                              : t('connectRequestPending')}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-secondary btn-sm"
+                          onClick={() => handleConnectRequest(person.id)}
+                          disabled={contactLoading === person.id}
+                        >
+                          🤝 {t('connectRequest')}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <button 
-                    type="button"
-                    className="btn-small btn-secondary"
-                    onClick={() => handleUnblockMember(member.id)}
-                  >
-                    Unblock
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Block Member Modal */}
-        {showBlockMemberModal && (
-          <div className="location-form-modal">
-            <div className="location-form">
-              <h4>Block a Member</h4>
-              <p className="modal-description">
-                Search for a member to block. Blocked members won't be matched with you in any events.
-              </p>
-              
-              <div className="form-group">
-                <label htmlFor="searchMember">Search Member</label>
-                <input
-                  type="text"
-                  id="searchMember"
-                  value={searchMemberQuery}
-                  onChange={(e) => setSearchMemberQuery(e.target.value)}
-                  placeholder="Search by name or phone number..."
-                  autoFocus
-                />
-              </div>
-
-              <div className="members-search-results">
-                {getFilteredMembers().length === 0 ? (
-                  <p className="no-results">No members found matching your search.</p>
-                ) : (
-                  getFilteredMembers().slice(0, 10).map(member => (
-                    <div key={member.id} className="search-result-item">
-                      <div className="member-info">
-                        <div className="member-avatar-small">
-                          {member.name[0].toUpperCase()}
-                        </div>
-                        <div className="member-details">
-                          <strong>{member.name}</strong>
-                          <small>{member.phone}</small>
-                        </div>
-                      </div>
-                      <button 
-                        type="button"
-                        className="btn-tiny btn-danger"
-                        onClick={() => handleBlockMember(member)}
-                      >
-                        🚫 Block
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="form-actions">
-                <button 
-                  type="button" 
-                  className="btn-secondary"
-                  onClick={() => {
-                    setShowBlockMemberModal(false);
-                    setSearchMemberQuery('');
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Account Information */}
         <div className="account-info">
-          <h3>Account Information</h3>
+          <h3>🔐 {t('accountInfo')}</h3>
           <div className="info-grid">
             <div className="info-item">
-              <strong>Phone Number:</strong> {formData.phoneNumber || 'Not provided'}
-              {isPhoneVerified && <span className="verified-badge-small">✅ Verified</span>}
+              <strong>{t('displayName')}:</strong>{' '}
+              {userProfile?.displayName || '—'}
             </div>
             <div className="info-item">
-              <strong>Email:</strong> {userProfile?.email || 'Not provided'}
+              <strong>Email:</strong> {userProfile?.email || '—'}
             </div>
             <div className="info-item">
-              <strong>Account Type:</strong> {userProfile?.isAnonymous ? 'Name-based' : 'Google Account'}
+              <strong>{t('accountStatus')}:</strong>{' '}
+              {userProfile?.isBlocked ? (
+                <span className="status-blocked">{t('accountBlocked')}</span>
+              ) : (
+                <span className="status-active">{t('accountActive')}</span>
+              )}
             </div>
             <div className="info-item">
-              <strong>Account Status:</strong> <span className="status-active">✅ Active</span>
-            </div>
-            <div className="info-item">
-              <strong>Member Since:</strong> {
-                userProfile?.createdAt ? 
-                new Date(userProfile.createdAt).toLocaleDateString() : 
-                'Recently joined'
-              }
-            </div>
-            <div className="info-item">
-              <strong>Last Updated:</strong> {
-                userProfile?.lastUpdated ? 
-                new Date(userProfile.lastUpdated).toLocaleDateString() : 
-                'Never'
-              }
+              <strong>Member Since:</strong>{' '}
+              {userProfile?.createdAt
+                ? new Date(userProfile.createdAt).toLocaleDateString()
+                : '—'}
             </div>
           </div>
+
+          {/* Blocked: show appeal option */}
+          {userProfile?.isBlocked && (
+            <div className="blocked-notice">
+              <p>{t('accountBlockedNote')}</p>
+              {appealStatus?.status === 'pending' ? (
+                <p className="appeal-pending-msg">⏳ {t('appealPending')}</p>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    onClick={() => setShowAppealForm(v => !v)}
+                  >
+                    📝 {t('appealButton')}
+                  </button>
+                  {showAppealForm && (
+                    <form onSubmit={handleSubmitAppeal} className="appeal-form">
+                      <textarea
+                        value={appealText}
+                        onChange={e => setAppealText(e.target.value)}
+                        rows={3}
+                        placeholder={t('appealPlaceholder')}
+                        maxLength={1000}
+                        required
+                      />
+                      <button type="submit" className="btn-primary" disabled={appealLoading}>
+                        {appealLoading ? '...' : t('appealSubmit')}
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

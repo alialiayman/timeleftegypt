@@ -111,7 +111,7 @@ export default function EventsScreen() {
   const handleBookEvent = async (event) => {
     if (!currentUser) return;
     if (userProfile?.isBlocked) {
-      showMessage('Your account is blocked. You cannot book events.');
+      showMessage(t('accountBlockedNote'));
       return;
     }
     const existing = myBookings[event.id];
@@ -222,9 +222,10 @@ export default function EventsScreen() {
         createdBy: currentUser.uid,
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        // Store venue separately; it is internal and not displayed publicly
+        // venueLocation: internal venue, never displayed publicly
         venueLocation: newEvent.locationName,
-        locationName: newEvent.locality || newEvent.locationName,
+        // locationName: public-facing locality label
+        locationName: newEvent.locality,
         locality: newEvent.locality,
         locationRevealed: false,
       });

@@ -23,7 +23,7 @@ export default function SuperAdminPanel({ onBack }) {
 
   // Load localities in real-time
   useEffect(() => {
-    const q = query(collection(db, 'localities'), orderBy('country'), orderBy('city'));
+    const q = query(collection(db, 'localities'), orderBy('country'));
     const unsub = onSnapshot(q, (snap) => {
       setLocalities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);

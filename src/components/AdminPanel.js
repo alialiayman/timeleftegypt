@@ -34,9 +34,8 @@ function AdminPanel({ onBack }) {
   const [appealLoading, setAppealLoading] = useState(null);
   const [showAppeals, setShowAppeals] = useState(false);
 
-  // Load pending appeals
+  // Load pending appeals — component only mounts for admins, so no guard needed
   useEffect(() => {
-    if (!isAdmin()) return;
     const q = query(
       collection(db, 'appeals'),
       where('status', '==', 'pending'),
@@ -46,7 +45,7 @@ function AdminPanel({ onBack }) {
       setAppeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, () => {});
     return unsub;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const showMemberMsg = (msg) => {
     setMemberMsg(msg);

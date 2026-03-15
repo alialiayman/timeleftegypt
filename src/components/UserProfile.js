@@ -5,7 +5,7 @@ import { db, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   collection, query, where, onSnapshot, addDoc, updateDoc, doc,
-  getDocs, orderBy
+  getDocs, orderBy, documentId
 } from 'firebase/firestore';
 
 const ALL_INTERESTS = [
@@ -131,7 +131,7 @@ function UserProfile({ onBack }) {
         for (let i = 0; i < metIds.length; i += 10) {
           const batch = metIds.slice(i, i + 10);
           profilePromises.push(
-            getDocs(query(collection(db, 'users'), where('id', 'in', batch)))
+            getDocs(query(collection(db, 'users'), where(documentId(), 'in', batch)))
           );
         }
         const profileSnaps = await Promise.all(profilePromises);
@@ -195,7 +195,7 @@ function UserProfile({ onBack }) {
       if (!snap.empty) {
         const latest = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))[0];
+          .sort((a, b) => (b.createdAt > a.createdAt ? -1 : 1))[0];
         setAppealStatus(latest);
       }
     }, () => {});

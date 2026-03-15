@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
-  collection, query, where, onSnapshot, doc, getDoc
+  collection, query, where, onSnapshot, getDocs, documentId
 } from 'firebase/firestore';
 import { BOOKING_STATUS } from '../models';
 
@@ -67,23 +67,27 @@ function Dashboard({ setCurrentView }) {
       const now = new Date().toISOString();
       const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Fetch event details for each booking
-      const eventPromises = bookings.map(async (booking) => {
-        try {
-          const eventSnap = await getDoc(doc(db, 'events', booking.eventId));
-          if (!eventSnap.exists()) return null;
-          const event = { id: eventSnap.id, ...eventSnap.data() };
-          // Only include upcoming events
-          if (event.dateTime && event.dateTime >= now && event.status !== 'cancelled') {
-            return event;
-          }
-          return null;
-        } catch {
-          return null;
-        }
-      });
+      if (bookings.length === 0) {
+        setUpcomingEvents([]);
+        setEventsLoading(false);
+        return;
+      }
 
-      const events = (await Promise.all(eventPromises)).filter(Boolean);
+      const eventIds = bookings.map(b => b.eventId);
+      // Batch fetch events using 'in' queries (max 10 per batch)
+      const eventMap = {};
+      for (let i = 0; i < eventIds.length; i += 10) {
+        const batch = eventIds.slice(i, i + 10);
+        const evSnap = await getDocs(
+          query(collection(db, 'events'), where(documentId(), 'in', batch))
+        );
+        evSnap.docs.forEach(d => { eventMap[d.id] = { id: d.id, ...d.data() }; });
+      }
+
+      // Filter to upcoming, non-cancelled events
+      const events = Object.values(eventMap).filter(
+        ev => ev.dateTime && ev.dateTime >= now && ev.status !== 'cancelled'
+      );
       events.sort((a, b) => (a.dateTime > b.dateTime ? 1 : -1));
       setUpcomingEvents(events);
       setEventsLoading(false);

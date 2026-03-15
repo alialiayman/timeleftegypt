@@ -3,7 +3,7 @@ import './App.css';
 import './i18n';
 import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import LoginForm from './components/LoginForm';
+import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
@@ -32,7 +32,7 @@ function AppContent() {
   }
 
   if (!currentUser) {
-    return <LoginForm />;
+    return <LandingPage />;
   }
 
   if (!userProfile) {

@@ -182,22 +182,6 @@ function Dashboard({ setCurrentView }) {
             >
               {t('editProfile')}
             </button>
-            {isAdmin() && (
-              <button
-                className="btn-primary"
-                onClick={() => setCurrentView('admin')}
-              >
-                {t('admin')}
-              </button>
-            )}
-            {isSuperAdmin() && (
-              <button
-                className="btn-primary"
-                onClick={() => setCurrentView('superAdmin')}
-              >
-                {t('superAdmin')}
-              </button>
-            )}
             <button className="btn-danger" onClick={handleLogout}>
               {t('logout')}
             </button>

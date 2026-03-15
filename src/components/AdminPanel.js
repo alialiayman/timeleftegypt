@@ -394,8 +394,8 @@ function AdminPanel({ onBack }) {
 
   const getUserRoleDisplay = (user) => {
     console.log('🏷️ Display role for user:', user.displayName || user.name, 'role:', user.role);
-    if (user.role === 'super-admin') return '👑 Super Admin';
-    if (user.role === 'admin') return '🔧 Admin';
+    if (user.role === 'super-admin') return 'Super Admin';
+    if (user.role === 'admin') return 'Admin';
     return user.isAnonymous ? 'Name-based' : 'Google';
   };
 
@@ -710,149 +710,10 @@ function AdminPanel({ onBack }) {
         <button className="back-btn" onClick={onBack}>
           ← Back to Dashboard
         </button>
-        <h2>{isSuperAdmin() ? '👑 Super Admin Panel' : '🔧 Admin Panel'}</h2>
+        <h2>{isSuperAdmin() ? 'Super Admin Panel' : '🔧 Admin Panel'}</h2>
       </div>
 
       <div className="admin-content">
-        {/* Location Management Section - Super Admin Only */}
-        {isSuperAdmin() && (
-        <div className="admin-section">
-          <h3>🌍 Location Management</h3>
-          <div className="location-info">
-            <p><strong>Note:</strong> This is a mock demonstration. The app will support international locations across multiple countries and cities.</p>
-          </div>
-          
-          <div className="location-controls">
-            <button 
-              className="btn-primary"
-              onClick={() => setShowLocationForm(true)}
-              disabled={loading}
-            >
-              ➕ Add New Location
-            </button>
-          </div>
-
-          {showLocationForm && (
-            <div className="location-form-modal">
-              <div className="location-form">
-                <h4>{editingLocation ? 'Edit Location' : 'Add New Location'}</h4>
-                <form onSubmit={editingLocation ? handleUpdateLocation : handleAddLocation}>
-                  <div className="form-group">
-                    <label htmlFor="name">Restaurant Name *</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={locationForm.name}
-                      onChange={handleLocationFormChange}
-                      required
-                      maxLength={100}
-                      placeholder="e.g., Downtown Bistro"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="googleMapsLink">Google Maps Link</label>
-                    <input
-                      type="url"
-                      id="googleMapsLink"
-                      name="googleMapsLink"
-                      value={locationForm.googleMapsLink}
-                      onChange={handleLocationFormChange}
-                      placeholder="https://maps.google.com/..."
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="description">Description</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={locationForm.description}
-                      onChange={handleLocationFormChange}
-                      rows="3"
-                      maxLength={300}
-                      placeholder="Additional details about this location..."
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="expectedTime">Expected Arrival Time</label>
-                    <input
-                      type="text"
-                      id="expectedTime"
-                      name="expectedTime"
-                      value={locationForm.expectedTime}
-                      onChange={handleLocationFormChange}
-                      maxLength={50}
-                      placeholder="e.g., 7:00 PM, In 30 minutes"
-                    />
-                  </div>
-
-                  <div className="form-actions">
-                    <button type="button" className="btn-secondary" onClick={cancelLocationForm}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn-primary" disabled={loading}>
-                      {loading ? 'Saving...' : (editingLocation ? 'Update Location' : 'Add Location')}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          <div className="locations-hierarchy">
-            {/* Mock Location Hierarchy */}
-            <div className="country-section">
-              <div className="country-header">
-                <h4>🇪🇬 Egypt</h4>
-              </div>
-              <div className="city-section">
-                <div className="city-header">
-                  <h5>📍 Cairo</h5>
-                </div>
-                <div className="areas-list">
-                  <div className="area-item">
-                    <span className="area-name">Downtown</span>
-                    <div className="area-actions">
-                      <button className="btn-small btn-secondary" disabled={loading}>
-                        ✏️ Edit
-                      </button>
-                      <button className="btn-small btn-danger" disabled={loading}>
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                  <div className="area-item">
-                    <span className="area-name">New Cairo</span>
-                    <div className="area-actions">
-                      <button className="btn-small btn-secondary" disabled={loading}>
-                        ✏️ Edit
-                      </button>
-                      <button className="btn-small btn-danger" disabled={loading}>
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                  <div className="area-item">
-                    <span className="area-name">6th October</span>
-                    <div className="area-actions">
-                      <button className="btn-small btn-secondary" disabled={loading}>
-                        ✏️ Edit
-                      </button>
-                      <button className="btn-small btn-danger" disabled={loading}>
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
-
         {/* Event Management Section - Regular Admin */}
         {!isSuperAdmin() && (
         <div className="admin-section">
@@ -1570,7 +1431,7 @@ function AdminPanel({ onBack }) {
                     </div>
                     <div className="member-status-col">
                       {user.role === 'super-admin' || user.role === 'super_admin' ? (
-                        <span className="role-badge super-admin-badge">👑 {t('roleSuperAdmin')}</span>
+                        <span className="role-badge super-admin-badge">{t('roleSuperAdmin')}</span>
                       ) : user.role === 'admin' || user.role === 'event_admin' ? (
                         <span className="role-badge admin-badge">🔧 {t('roleAdmin')}</span>
                       ) : (

@@ -128,7 +128,7 @@ export default function SuperAdminPanel({ onBack }) {
         <button className="back-btn" onClick={onBack}>
           ← {t('dashboard')}
         </button>
-        <h2>👑 {t('superAdminPanel')}</h2>
+        <h2>{t('superAdminPanel')}</h2>
       </div>
 
       {message && <div className="message-banner">{message}</div>}

@@ -4191,3 +4191,590 @@ body {
     padding: 28px 20px;
   }
 }
+
+/* ============================================================
+   NEW FEATURE STYLES — Gatherly v2
+   Color system reuses the established landing-page palette
+   ============================================================ */
+
+/* Header greeting */
+.header-greeting {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+/* Super-admin nav button (gold accent) */
+.nav-btn-super {
+  background: rgba(251, 191, 36, 0.25) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+}
+.nav-btn-super.active,
+.nav-btn-super:hover {
+  background: rgba(251, 191, 36, 0.45) !important;
+}
+
+/* Small button variant */
+.btn-sm, .btn-tiny {
+  padding: 6px 12px !important;
+  font-size: 0.8rem !important;
+}
+.btn-tiny {
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+}
+
+/* Info / note callout */
+.info-note {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: #78716c;
+  margin-bottom: 1rem;
+}
+
+/* ---- Dashboard Interests ---- */
+.interests-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.interests-section h3 {
+  margin-bottom: 1rem;
+  color: #1c1917;
+  font-size: 1.1rem;
+}
+
+.interests-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.interest-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.interest-remove-btn {
+  background: rgba(255,255,255,0.3);
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  padding: 0;
+  line-height: 1;
+}
+.interest-remove-btn:hover {
+  background: rgba(255,255,255,0.5);
+}
+
+.interests-add-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.interest-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.interest-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+}
+
+.interests-saved-msg,
+.save-success-msg {
+  color: #16a34a;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.no-interests-msg {
+  color: #78716c;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* ---- Events Screen ---- */
+.price-currency-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.price-currency-row select {
+  width: 90px;
+}
+
+.venue-note {
+  color: #f97316;
+  font-size: 0.8rem;
+}
+
+.pending-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.event-pending {
+  border-left: 4px solid #f59e0b !important;
+}
+
+/* ---- Profile Interests Tags ---- */
+.interests-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.interest-tag {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 2px solid #dee2e6;
+  background: #f8f9fa;
+  color: #495057;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.interest-tag:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.interest-tag.selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+  color: white;
+}
+
+/* ---- Profile field note ---- */
+.field-note {
+  display: block;
+  color: #78716c;
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+/* ---- Met People & Ratings ---- */
+.met-people-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.met-people-section h3 {
+  margin-bottom: 1rem;
+  color: #1c1917;
+}
+
+.met-people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.met-person-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #fafafa;
+}
+
+.person-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.person-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.person-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-details {
+  display: flex;
+  flex-direction: column;
+}
+.person-details strong { font-size: 0.95rem; }
+.person-details small { color: #78716c; font-size: 0.8rem; }
+
+.star-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rating-label {
+  font-size: 0.85rem;
+  color: #78716c;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #d1d5db;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+.star-btn:hover,
+.star-btn.star-filled {
+  color: #f59e0b;
+}
+.star-btn:disabled {
+  opacity: 0.5;
+}
+
+.rating-saved-msg {
+  font-size: 0.8rem;
+  color: #16a34a;
+}
+
+.connect-row {
+  margin-top: 0.5rem;
+}
+
+.connect-status {
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.connect-pending { background: #fef3c7; color: #92400e; }
+.connect-approved { background: #d1fae5; color: #065f46; }
+.connect-rejected { background: #fee2e2; color: #991b1b; }
+
+.empty-state-text {
+  color: #78716c;
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+/* ---- Account Status / Appeal ---- */
+.status-blocked {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.blocked-notice {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.blocked-notice p {
+  color: #7f1d1d;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.appeal-form {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appeal-form textarea {
+  padding: 8px;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  resize: vertical;
+  font-size: 0.9rem;
+}
+
+.appeal-pending-msg {
+  color: #92400e;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ---- Admin: Member Management ---- */
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.members-management-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.member-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  flex-wrap: wrap;
+}
+
+.member-row.member-blocked {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.member-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 160px;
+}
+.member-info-col strong { font-size: 0.9rem; }
+.member-info-col small { font-size: 0.78rem; color: #78716c; }
+
+.member-status-col {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.member-actions-col {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Role badges */
+.role-badge {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.super-admin-badge { background: #fef3c7; color: #92400e; }
+.admin-badge { background: #e0e7ff; color: #3730a3; }
+.friend-badge { background: #f0fdf4; color: #166534; }
+
+/* ---- Appeals ---- */
+.appeals-section {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.appeals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.appeal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.appeal-info p {
+  font-size: 0.85rem;
+  color: #374151;
+  margin: 4px 0;
+}
+
+.appeal-info small { color: #9ca3af; font-size: 0.75rem; }
+
+.appeal-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---- Super Admin Panel ---- */
+.super-admin-panel .admin-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.localities-table {
+  margin-top: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.localities-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr auto;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.localities-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 2fr auto;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.localities-row:last-child { border-bottom: none; }
+.localities-row:hover { background: #fafafa; }
+
+.admin-names { color: #6b7280; font-size: 0.82rem; }
+
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+/* Locality form */
+.locality-form {
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.users-checklist {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.user-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.user-check-item input { cursor: pointer; }
+
+.no-results {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .header-greeting {
+    display: none;
+  }
+  .interests-add-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .localities-header,
+  .localities-row {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .localities-header span:nth-child(4),
+  .localities-row span:nth-child(4),
+  .localities-header span:nth-child(5),
+  .localities-row span:nth-child(5) {
+    display: none;
+  }
+  .member-row {
+    flex-direction: column;
+  }
+  .price-currency-row {
+    flex-direction: column;
+  }
+}

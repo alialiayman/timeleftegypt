@@ -1,26 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { shuffleTables, assignUsersToTables, getTableDistributionStats } from '../algorithms/tableAssignment';
 import { db } from '../firebase';
-import { doc, writeBatch, updateDoc, getDoc } from 'firebase/firestore';
+import {
+  doc, writeBatch, updateDoc, getDoc,
+  collection, query, where, onSnapshot, orderBy
+} from 'firebase/firestore';
 
 function AdminPanel({ onBack }) {
-  const { 
-    users, 
-    tables, 
-    settings, 
-    updateSettings, 
-    addLocation, 
-    updateLocation, 
+  const { t } = useTranslation();
+  const {
+    users,
+    tables,
+    settings,
+    updateSettings,
+    addLocation,
+    updateLocation,
     deleteLocation,
-    isAdmin, 
-    isSuperAdmin 
+    isAdmin,
+    isSuperAdmin,
   } = useAuth();
   const [loading, setLoading] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     maxPeoplePerTable: settings.maxPeoplePerTable || 5,
-    considerLocation: settings.considerLocation || false
+    considerLocation: settings.considerLocation || false,
   });
+
+  // Member management state
+  const [memberMsg, setMemberMsg] = useState('');
+  const [memberLoading, setMemberLoading] = useState(null);
+  const [appeals, setAppeals] = useState([]);
+  const [appealLoading, setAppealLoading] = useState(null);
+  const [showAppeals, setShowAppeals] = useState(false);
+
+  // Load pending appeals
+  useEffect(() => {
+    if (!isAdmin()) return;
+    const q = query(
+      collection(db, 'appeals'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setAppeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {});
+    return unsub;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const showMemberMsg = (msg) => {
+    setMemberMsg(msg);
+    setTimeout(() => setMemberMsg(''), 3000);
+  };
+
+  const handleToggleBlock = async (user) => {
+    setMemberLoading(user.id);
+    try {
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, {
+        isBlocked: !user.isBlocked,
+        lastUpdated: new Date().toISOString(),
+      });
+      showMemberMsg(user.isBlocked ? t('memberUnblocked') : t('memberBlocked'));
+    } catch (err) {
+      console.error('Toggle block error:', err);
+    } finally {
+      setMemberLoading(null);
+    }
+  };
+
+  const handleToggleAdmin = async (user) => {
+    setMemberLoading(user.id);
+    try {
+      const userRef = doc(db, 'users', user.id);
+      const newRole = (user.role === 'admin' || user.role === 'event_admin') ? '' : 'admin';
+      await updateDoc(userRef, {
+        role: newRole,
+        lastUpdated: new Date().toISOString(),
+      });
+      showMemberMsg(newRole === 'admin' ? t('memberPromoted') : t('memberDemoted'));
+    } catch (err) {
+      console.error('Toggle admin error:', err);
+    } finally {
+      setMemberLoading(null);
+    }
+  };
+
+  const handleResolveAppeal = async (appeal, action) => {
+    setAppealLoading(appeal.id);
+    try {
+      await updateDoc(doc(db, 'appeals', appeal.id), {
+        status: action,
+        reviewedAt: new Date().toISOString(),
+      });
+      if (action === 'approved') {
+        // Unblock the user
+        await updateDoc(doc(db, 'users', appeal.userId), {
+          isBlocked: false,
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error('Resolve appeal error:', err);
+    } finally {
+      setAppealLoading(null);
+    }
+  };
 
   // Location management states
   const [showLocationForm, setShowLocationForm] = useState(false);
@@ -1414,6 +1499,117 @@ function AdminPanel({ onBack }) {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Member Management Section - All Admins */}
+        {isAdmin() && (
+          <div className="admin-section">
+            <div className="section-header-row">
+              <h3>👥 {t('memberManagement')}</h3>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setShowAppeals(v => !v)}
+              >
+                📋 {t('viewAppeals')} {appeals.length > 0 && `(${appeals.length})`}
+              </button>
+            </div>
+
+            {memberMsg && <div className="message-banner">{memberMsg}</div>}
+
+            {/* Appeals Section */}
+            {showAppeals && (
+              <div className="appeals-section">
+                <h4>📋 {t('viewAppeals')}</h4>
+                {appeals.length === 0 ? (
+                  <p className="empty-state-text">{t('noAppeals')}</p>
+                ) : (
+                  <div className="appeals-list">
+                    {appeals.map(appeal => {
+                      const user = users.find(u => u.id === appeal.userId);
+                      return (
+                        <div key={appeal.id} className="appeal-item">
+                          <div className="appeal-info">
+                            <strong>{user?.displayName || user?.name || appeal.userId}</strong>
+                            <p>{appeal.message}</p>
+                            <small>{new Date(appeal.createdAt).toLocaleDateString()}</small>
+                          </div>
+                          <div className="appeal-actions">
+                            <button
+                              className="btn-primary btn-sm"
+                              onClick={() => handleResolveAppeal(appeal, 'approved')}
+                              disabled={appealLoading === appeal.id}
+                            >
+                              ✅ {t('approveAppeal')}
+                            </button>
+                            <button
+                              className="btn-danger btn-sm"
+                              onClick={() => handleResolveAppeal(appeal, 'rejected')}
+                              disabled={appealLoading === appeal.id}
+                            >
+                              ✗ {t('rejectAppeal')}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Member Table */}
+            <div className="members-management-table">
+              {users.length === 0 ? (
+                <p className="empty-state-text">No users found.</p>
+              ) : (
+                users.map(user => (
+                  <div key={user.id} className={`member-row ${user.isBlocked ? 'member-blocked' : ''}`}>
+                    <div className="member-info-col">
+                      <strong>{user.displayName || user.name || 'Unknown'}</strong>
+                      <small>{user.email || ''}</small>
+                      {user.localityLabel && <small>📍 {user.localityLabel}</small>}
+                    </div>
+                    <div className="member-status-col">
+                      {user.role === 'super-admin' || user.role === 'super_admin' ? (
+                        <span className="role-badge super-admin-badge">👑 {t('roleSuperAdmin')}</span>
+                      ) : user.role === 'admin' || user.role === 'event_admin' ? (
+                        <span className="role-badge admin-badge">🔧 {t('roleAdmin')}</span>
+                      ) : (
+                        <span className="role-badge friend-badge">👤 {t('roleFriend')}</span>
+                      )}
+                      {user.isBlocked && (
+                        <span className="status-blocked">🚫 Blocked</span>
+                      )}
+                    </div>
+                    <div className="member-actions-col">
+                      {/* Don't show actions for super admins */}
+                      {user.role !== 'super-admin' && user.role !== 'super_admin' && (
+                        <>
+                          <button
+                            className="btn-secondary btn-tiny"
+                            onClick={() => handleToggleAdmin(user)}
+                            disabled={memberLoading === user.id}
+                            title={user.role === 'admin' || user.role === 'event_admin' ? t('removeAdmin') : t('promoteToAdmin')}
+                          >
+                            {user.role === 'admin' || user.role === 'event_admin'
+                              ? `⬇️ ${t('removeAdmin')}`
+                              : `⬆️ ${t('promoteToAdmin')}`}
+                          </button>
+                          <button
+                            className={user.isBlocked ? 'btn-secondary btn-tiny' : 'btn-danger btn-tiny'}
+                            onClick={() => handleToggleBlock(user)}
+                            disabled={memberLoading === user.id}
+                          >
+                            {user.isBlocked ? `✅ ${t('unblockMember')}` : `🚫 ${t('blockMember')}`}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         )}
 
         {/* User Management Section - Super Admin Only */}

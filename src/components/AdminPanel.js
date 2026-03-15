@@ -56,7 +56,7 @@ function AdminPanel({ onBack }) {
     : users.filter(u => u.role !== 'super-admin');
 
   const pendingMembers = localityMembers.filter(u => !u.isBlocked && !u.role);
-  const activeMembers = localityMembers.filter(u => !u.isBlocked && (u.role === '' || u.role === 'admin' || u.role === 'event_admin' || !u.role));
+  const activeMembers = localityMembers.filter(u => !u.isBlocked);
   const blockedMembers = localityMembers.filter(u => u.isBlocked);
 
   const appealUsers = {};

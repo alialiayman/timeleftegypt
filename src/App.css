@@ -1,9 +1,12 @@
 /* ============================================================
    GATHERLY SHARED DESIGN TOKENS
-   Warm orange / cream palette — mirrors the landing page (lp-*)
+   Warm orange / cream palette — mirrors the landing page (.lp class,
+   defined further below in this file around the "GATHERLY LANDING PAGE"
+   section). When updating landing page --lp-* tokens, also update
+   the --g-* tokens here to keep the full app visually consistent.
    ============================================================ */
 :root {
-  /* Primary brand colors (from landing page) */
+  /* Primary brand colors (mirrors --lp-primary / --lp-primary-dark from .lp) */
   --g-primary:        #f97316;
   --g-primary-dark:   #ea580c;
   --g-primary-light:  #fed7aa;

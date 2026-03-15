@@ -282,7 +282,7 @@ export default function EventsScreen() {
 
   const handleSaveScheduler = async () => {
     if (schedulerGroups.some(g => !g.name.trim())) {
-      showMessage(t('schedulerVenueName') + ' — ' + t('errorGeneral')); return;
+      showMessage(t('schedulerVenueNameRequired')); return;
     }
     setSchedulerLoading(true);
     try {
@@ -717,7 +717,12 @@ export default function EventsScreen() {
                 onClick={() => setSelectedEvent(event)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setSelectedEvent(event)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedEvent(event);
+                  }
+                }}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="event-type-badge">{EVENT_TYPE_LABELS[event.type] || event.type}</div>

@@ -108,6 +108,7 @@ const resources = {
       schedulerVenueNamePlaceholder: 'e.g. Citystars Cinema, Screen 3',
       schedulerAddressPlaceholder: 'e.g. 1st District, New Cairo',
       schedulerRunning: 'Running scheduler...',
+      schedulerVenueNameRequired: 'All venue groups must have a name.',
 
       // Dashboard venue reveal
       yourVenue: 'Your Venue',
@@ -462,6 +463,7 @@ const resources = {
       schedulerVenueNamePlaceholder: 'مثال: سينما سيتي ستارز، قاعة 3',
       schedulerAddressPlaceholder: 'مثال: الحي الأول، القاهرة الجديدة',
       schedulerRunning: 'جارٍ تشغيل الجدولة...',
+      schedulerVenueNameRequired: 'يجب أن تحتوي جميع مجموعات الأماكن على اسم.',
 
       // Dashboard venue reveal (AR)
       yourVenue: 'مكانك',

@@ -23,8 +23,6 @@ function Dashboard({ setCurrentView }) {
   const {
     userProfile,
     logout,
-    isAdmin,
-    isSuperAdmin,
     updateUserProfile,
   } = useAuth();
 
@@ -308,6 +306,26 @@ function Dashboard({ setCurrentView }) {
                 {event.description && (
                   <p className="event-description">{event.description}</p>
                 )}
+
+                {/* Assigned venue reveal for booked users */}
+                {event.locationRevealed && event.venueGroups?.length > 0 && (() => {
+                  const uid = userProfile?.id;
+                  const assigned = event.venueGroups.find(g => Array.isArray(g.attendeeIds) && g.attendeeIds.includes(uid));
+                  if (!assigned) return null;
+                  return (
+                    <div className="assigned-venue-card assigned-venue-card--inline">
+                      <p className="assigned-venue-label">🎉 {t('yourVenue')}</p>
+                      <p className="venue-name">{assigned.name}</p>
+                      {assigned.address && <p className="venue-address">📍 {assigned.address}</p>}
+                      {assigned.mapsLink && (
+                        <a href={assigned.mapsLink} target="_blank" rel="noopener noreferrer"
+                          className="btn-secondary btn-sm venue-map-link">
+                          🗺️ {t('venueMapsLink')}
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

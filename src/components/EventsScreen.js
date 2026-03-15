@@ -265,8 +265,12 @@ export default function EventsScreen() {
   const handleRemoveGroup = (idx) => {
     setSchedulerGroups(prev => {
       const updated = prev.filter((_, i) => i !== idx);
-      if (prev[idx]?.attendeeIds?.length > 0 && updated.length > 0) {
-        updated[0] = { ...updated[0], attendeeIds: [...updated[0].attendeeIds, ...prev[idx].attendeeIds] };
+      const displaced = prev[idx]?.attendeeIds || [];
+      if (displaced.length > 0 && updated.length > 0) {
+        displaced.forEach((uid, i) => {
+          const target = i % updated.length;
+          updated[target] = { ...updated[target], attendeeIds: [...updated[target].attendeeIds, uid] };
+        });
       }
       return updated;
     });
@@ -713,7 +717,7 @@ export default function EventsScreen() {
                 onClick={() => setSelectedEvent(event)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && setSelectedEvent(event)}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setSelectedEvent(event)}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="event-type-badge">{EVENT_TYPE_LABELS[event.type] || event.type}</div>

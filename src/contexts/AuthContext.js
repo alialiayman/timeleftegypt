@@ -171,8 +171,11 @@ export function AuthProvider({ children }) {
         email: currentUser.email || currentProfile.email || '',
         displayName: profileData.displayName || currentProfile.displayName || currentUser.displayName || '',
         name: profileData.name || profileData.displayName || currentProfile.name || currentUser.displayName || '',
-        fullName: profileData.fullName || currentProfile.fullName || '',
+        fullName: profileData.fullName !== undefined ? profileData.fullName : currentProfile.fullName || '',
         city: profileData.city !== undefined ? profileData.city : currentProfile.city || '',
+        phoneNumber: profileData.phoneNumber !== undefined ? profileData.phoneNumber : currentProfile.phoneNumber || '',
+        localityId: profileData.localityId !== undefined ? profileData.localityId : currentProfile.localityId || '',
+        localityLabel: profileData.localityLabel !== undefined ? profileData.localityLabel : currentProfile.localityLabel || '',
         photoURL: profileData.photoURL || currentProfile.photoURL || currentUser.photoURL || '',
         gender: profileData.gender !== undefined ? profileData.gender : currentProfile.gender || '',
         preferences: {
@@ -182,6 +185,7 @@ export function AuthProvider({ children }) {
         location: profileData.location !== undefined ? profileData.location : currentProfile.location || null,
         currentLocationId: profileData.currentLocationId !== undefined ? profileData.currentLocationId : currentProfile.currentLocationId || null,
         checkedInAt: profileData.checkedInAt !== undefined ? profileData.checkedInAt : currentProfile.checkedInAt || null,
+        isBlocked: profileData.isBlocked !== undefined ? profileData.isBlocked : currentProfile.isBlocked || false,
         role: profileData.role !== undefined ? profileData.role : currentProfile.role || '', // Preserve role field
         isAnonymous: profileData.isAnonymous !== undefined ? profileData.isAnonymous : currentProfile.isAnonymous || currentUser.isAnonymous,
         lastUpdated: new Date().toISOString(),

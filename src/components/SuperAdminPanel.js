@@ -6,6 +6,9 @@ import {
   collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
   orderBy, writeBatch
 } from 'firebase/firestore';
+import { notifyOrganizerAssigned } from '../services/emailService';
+
+const USERS_PAGE_SIZE = 20;
 
 export default function SuperAdminPanel({ onBack }) {
   const { t } = useTranslation();
@@ -20,6 +23,7 @@ export default function SuperAdminPanel({ onBack }) {
   const emptyForm = { country: '', city: '', area: '', adminIds: [] };
   const [form, setForm] = useState(emptyForm);
   const [adminSearch, setAdminSearch] = useState('');
+  const [usersPageSize, setUsersPageSize] = useState(USERS_PAGE_SIZE);
 
   // Load localities in real-time
   useEffect(() => {
@@ -52,12 +56,14 @@ export default function SuperAdminPanel({ onBack }) {
     setEditingId(null);
     setForm(emptyForm);
     setAdminSearch('');
+    setUsersPageSize(USERS_PAGE_SIZE);
   };
 
   /**
    * Sync organizerLocalityId on user documents whenever locality adminIds change.
    * Added users get organizerLocalityId set; removed users get it cleared
    * (only if it still points to this locality).
+   * Also queues email notifications for newly-assigned organizers.
    */
   const syncOrganizerLocality = async (localityId, localityLabel, newAdminIds, oldAdminIds = []) => {
     const batch = writeBatch(db);
@@ -81,6 +87,22 @@ export default function SuperAdminPanel({ onBack }) {
 
     if (added.length > 0 || removed.length > 0) {
       await batch.commit();
+    }
+
+    // Queue email notifications for newly-assigned organizers
+    for (const uid of added) {
+      const user = users.find(u => u.id === uid);
+      if (user?.email) {
+        try {
+          await notifyOrganizerAssigned({
+            email: user.email,
+            displayName: user.displayName || user.name || '',
+            localityLabel,
+          });
+        } catch (err) {
+          console.error('Failed to queue organizer assignment email:', err);
+        }
+      }
     }
   };
 
@@ -148,6 +170,9 @@ export default function SuperAdminPanel({ onBack }) {
     (u.displayName || u.name || '').toLowerCase().includes(adminSearch.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(adminSearch.toLowerCase())
   );
+
+  const visibleUsers = filteredUsers.slice(0, usersPageSize);
+  const hasMoreUsers = filteredUsers.length > usersPageSize;
 
   if (!isSuperAdmin()) {
     return (
@@ -236,7 +261,7 @@ export default function SuperAdminPanel({ onBack }) {
                     className="search-input"
                   />
                   <div className="users-checklist">
-                    {filteredUsers.slice(0, 20).map(u => (
+                    {visibleUsers.map(u => (
                       <label key={u.id} className="user-check-item">
                         <input
                           type="checkbox"
@@ -252,12 +277,21 @@ export default function SuperAdminPanel({ onBack }) {
                     {filteredUsers.length === 0 && (
                       <p className="no-results">No users found.</p>
                     )}
+                    {hasMoreUsers && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm load-more-btn"
+                        onClick={() => setUsersPageSize(prev => prev + USERS_PAGE_SIZE)}
+                      >
+                        {t('loadMore')} ({filteredUsers.length - usersPageSize} more)
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div className="form-actions">
                   <button type="button" className="btn btn-secondary" onClick={handleCancelForm}>
-                    {t('eventCancel')}
+                    {t('cancelForm')}
                   </button>
                   <button type="submit" className="btn btn-primary">
                     {t('saveLocality')}

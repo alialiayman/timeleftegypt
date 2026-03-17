@@ -175,12 +175,12 @@ function Dashboard({ setCurrentView }) {
           </div>
           <div className="user-actions">
             <button
-              className="btn-secondary"
+              className="btn btn-secondary"
               onClick={() => setCurrentView('profile')}
             >
               {t('editProfile')}
             </button>
-            <button className="btn-danger" onClick={handleLogout}>
+            <button className="btn btn-danger" onClick={handleLogout}>
               {t('logout')}
             </button>
           </div>
@@ -222,14 +222,14 @@ function Dashboard({ setCurrentView }) {
             maxLength={50}
           />
           <button
-            className="btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm"
             onClick={handleAddInterest}
             disabled={!interestInput.trim()}
           >
             {t('addInterest')}
           </button>
           <button
-            className="btn-primary btn-sm"
+            className="btn btn-primary btn-sm"
             onClick={handleSaveInterests}
             disabled={interestsSaving}
           >
@@ -253,7 +253,7 @@ function Dashboard({ setCurrentView }) {
           <div className="empty-state">
             <p>{t('noRsvpdEvents')}</p>
             <button
-              className="btn-primary"
+              className="btn btn-primary"
               onClick={() => setCurrentView('events')}
             >
               {t('eventBrowse')}

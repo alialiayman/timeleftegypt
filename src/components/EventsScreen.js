@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import {
   collection, query, orderBy, onSnapshot,
   addDoc, updateDoc, deleteDoc, doc, where, increment,
-  arrayUnion, arrayRemove, runTransaction, getDocs
+  arrayUnion, arrayRemove, runTransaction, getDocs, documentId
 } from 'firebase/firestore';
 import { EVENT_TYPES, BOOKING_STATUS, createEvent, createBooking } from '../models';
 
@@ -38,7 +38,7 @@ function distributeAttendees(attendeeIds, groupCount) {
 
 export default function EventsScreen() {
   const { t } = useTranslation();
-  const { currentUser, userProfile, isAdmin } = useAuth();
+  const { currentUser, userProfile, isAdmin, isSuperAdmin } = useAuth();
   const [events, setEvents] = useState([]);
   const [myBookings, setMyBookings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -54,6 +54,13 @@ export default function EventsScreen() {
   const [showScheduler, setShowScheduler] = useState(false);
   const [schedulerGroups, setSchedulerGroups] = useState([]);
   const [schedulerLoading, setSchedulerLoading] = useState(false);
+
+  // Booked friends for event owner view
+  const [bookedFriends, setBookedFriends] = useState([]);
+  const [bookedFriendsLoading, setBookedFriendsLoading] = useState(false);
+
+  // Presence/late status loading
+  const [presenceLoading, setPresenceLoading] = useState(false);
 
   const canCreate = !!(currentUser && userProfile);
 
@@ -116,6 +123,46 @@ export default function EventsScreen() {
     }
   }, [events, myPendingEvents]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load booked friends when an event owner opens the event detail
+  useEffect(() => {
+    if (!selectedEvent || !currentUser) return;
+    const isOwner = selectedEvent.createdBy === currentUser.uid;
+    if (!isOwner && !isSuperAdmin()) return;
+
+    setBookedFriendsLoading(true);
+    const q = query(
+      collection(db, 'bookings'),
+      where('eventId', '==', selectedEvent.id),
+      where('status', '==', BOOKING_STATUS.CONFIRMED)
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const userIds = [...new Set(bookings.map(b => b.userId).filter(uid => uid !== currentUser.uid))];
+      if (userIds.length === 0) {
+        setBookedFriends([]);
+        setBookedFriendsLoading(false);
+        return;
+      }
+      try {
+        const friends = [];
+        for (let i = 0; i < userIds.length; i += 10) {
+          const batch = userIds.slice(i, i + 10);
+          const snap2 = await getDocs(query(collection(db, 'users'), where(documentId(), 'in', batch)));
+          snap2.docs.forEach(d => {
+            const booking = bookings.find(b => b.userId === d.id);
+            friends.push({ id: d.id, ...d.data(), booking });
+          });
+        }
+        setBookedFriends(friends);
+      } catch (err) {
+        console.error('Error loading booked friends:', err);
+      } finally {
+        setBookedFriendsLoading(false);
+      }
+    }, () => setBookedFriendsLoading(false));
+    return unsub;
+  }, [selectedEvent?.id, currentUser, isSuperAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const showMessage = (msg) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
@@ -177,6 +224,21 @@ export default function EventsScreen() {
       showMessage(t('bookingCancel'));
     } catch (err) { showMessage(t('errorGeneral')); }
     finally { setBookingLoading(null); }
+  };
+
+  /* ── Presence / Late Status (friend, after venue reveal) ── */
+  const handlePresenceAction = async (event, status) => {
+    const booking = myBookings[event.id];
+    if (!booking) return;
+    setPresenceLoading(true);
+    try {
+      await updateDoc(doc(db, 'bookings', booking.id), {
+        presenceStatus: status,
+        lastUpdated: new Date().toISOString(),
+      });
+      showMessage(status === 'confirmed_present' ? t('presenceConfirmed') : t('lateMarked'));
+    } catch (err) { showMessage(t('errorGeneral')); }
+    finally { setPresenceLoading(false); }
   };
 
   /* ── Admin: Approve, Delete, Edit ── */
@@ -486,12 +548,14 @@ export default function EventsScreen() {
     const event = selectedEvent;
     const isPending = event.status === 'pending_approval';
     const isOwner = event.createdBy === currentUser?.uid;
-    const canAdminEdit = isAdmin() || isOwner;
+    // Only owner or Master (super admin) may edit/delete; regular Organizers can only view events they don't own
+    const canAdminEdit = isSuperAdmin() || isOwner;
     const bookingStatus = getBookingStatus(event.id);
     const isBooked = bookingStatus === BOOKING_STATUS.CONFIRMED;
     const left = spotsLeft(event);
     const isFull = left !== null && left <= 0;
     const assignedVenue = getAssignedVenueGroup(event);
+    const myBooking = myBookings[event.id];
 
     return (
       <div className="events-screen">
@@ -506,7 +570,7 @@ export default function EventsScreen() {
               {canAdminEdit && (
                 <button className="btn btn-danger btn-sm" onClick={() => handleDeleteEvent(event)}>🗑️ {t('eventDelete')}</button>
               )}
-              {isAdmin() && (
+              {(isOwner || isSuperAdmin()) && (
                 <button className="btn btn-primary btn-sm" onClick={() => handleOpenScheduler(event)}>📅 {t('runScheduler')}</button>
               )}
             </div>
@@ -568,6 +632,32 @@ export default function EventsScreen() {
                   <a href={assignedVenue.mapsLink} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary btn-sm">🗺️ {t('venueMapsLink')}</a>
                 )}
+                {/* Presence/Late actions after venue reveal */}
+                <div className="presence-actions">
+                  <p className="presence-label">{t('presenceStatus')}:</p>
+                  {myBooking?.presenceStatus === 'confirmed_present' ? (
+                    <span className="presence-badge presence-badge--confirmed">✅ {t('presenceConfirmed')}</span>
+                  ) : myBooking?.presenceStatus === 'going_late' ? (
+                    <span className="presence-badge presence-badge--late">⏰ {t('lateMarked')}</span>
+                  ) : (
+                    <div className="presence-buttons">
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handlePresenceAction(event, 'confirmed_present')}
+                        disabled={presenceLoading}
+                      >
+                        {t('confirmPresence')}
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handlePresenceAction(event, 'going_late')}
+                        disabled={presenceLoading}
+                      >
+                        {t('markLate')}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -581,6 +671,43 @@ export default function EventsScreen() {
                     <span className="attendees-count"> ({t('schedulerAttendeesAssigned', { count: g.attendeeIds?.length || 0 })})</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Booked friends list — visible only to event owner or Master */}
+            {(isOwner || isSuperAdmin()) && (
+              <div className="booked-friends-section">
+                <h3>👥 {t('bookedFriends')}</h3>
+                {bookedFriendsLoading ? (
+                  <div className="loading-container" style={{ height: 'auto', padding: '1rem' }}>
+                    <div className="loading-spinner"></div>
+                  </div>
+                ) : bookedFriends.length === 0 ? (
+                  <p className="empty-state-inline">{t('noBookedFriends')}</p>
+                ) : (
+                  <div className="booked-friends-list">
+                    {bookedFriends.map(friend => (
+                      <div key={friend.id} className="booked-friend-item">
+                        <div className="friend-avatar">
+                          {friend.photoURL
+                            ? <img src={friend.photoURL} alt="" />
+                            : (friend.displayName || friend.name || '?')[0].toUpperCase()
+                          }
+                        </div>
+                        <div className="friend-info">
+                          <strong>{friend.displayName || friend.name || '—'}</strong>
+                          {friend.email && <small>{friend.email}</small>}
+                          {friend.localityLabel && <small>📍 {friend.localityLabel}</small>}
+                        </div>
+                        {friend.booking?.presenceStatus && (
+                          <span className={`presence-badge presence-badge--${friend.booking.presenceStatus === 'confirmed_present' ? 'confirmed' : 'late'}`}>
+                            {friend.booking.presenceStatus === 'confirmed_present' ? '✅' : '⏰'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

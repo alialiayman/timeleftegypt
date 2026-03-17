@@ -14,14 +14,14 @@ const resources = {
 
       // Roles
       roleFriend: 'Friend',
-      roleAdmin: 'Admin',
-      roleSuperAdmin: 'Super Admin',
+      roleAdmin: 'Organizer',
+      roleSuperAdmin: 'Master',
 
       // Navigation
       dashboard: 'Dashboard',
       profile: 'Profile',
-      admin: 'Admin',
-      superAdmin: 'Super Admin',
+      admin: 'Organizer',
+      superAdmin: 'Master',
       events: 'Events',
 
       // Auth
@@ -62,7 +62,7 @@ const resources = {
       eventPublish: 'Publish Event',
       eventSubmitApproval: 'Submit for Approval',
       eventPendingApproval: 'Pending Approval',
-      eventApprovalNote: 'This event is awaiting admin approval before it becomes publicly visible.',
+      eventApprovalNote: 'This event is awaiting Organizer approval before it becomes publicly visible.',
       eventVenueHidden: 'Venue revealed after scheduling',
       eventEdit: 'Edit Event',
       eventCancel: 'Cancel Event',
@@ -140,7 +140,7 @@ const resources = {
       locationPending: 'Approval Pending',
       locationApproved: 'Approved',
       locationBlocked: 'Blocked',
-      awaitingApproval: 'Your location is awaiting admin approval.',
+      awaitingApproval: 'Your location is awaiting Organizer approval.',
       locationChange: 'Change Location',
 
       // Profile
@@ -190,7 +190,7 @@ const resources = {
       appealPending: 'Appeal pending review',
 
       // Admin
-      adminPanel: 'Admin Panel',
+      adminPanel: 'Organizer Panel',
       manageEvents: 'Manage Events',
       manageUsers: 'Manage Users',
       manageLocations: 'Manage Locations',
@@ -199,8 +199,8 @@ const resources = {
       scheduling: 'Scheduling',
       runScheduling: 'Run AI Scheduling',
       memberManagement: 'Community Members',
-      promoteToAdmin: 'Make Admin',
-      removeAdmin: 'Remove Admin',
+      promoteToAdmin: 'Make Organizer',
+      removeAdmin: 'Remove Organizer',
       blockMember: 'Block',
       unblockMember: 'Unblock',
       viewAppeals: 'Appeals',
@@ -209,8 +209,8 @@ const resources = {
       noAppeals: 'No pending appeals.',
       memberBlocked: 'Member blocked.',
       memberUnblocked: 'Member unblocked.',
-      memberPromoted: 'Member promoted to admin.',
-      memberDemoted: 'Admin role removed.',
+      memberPromoted: 'Member promoted to Organizer.',
+      memberDemoted: 'Organizer role removed.',
 
       // Admin page sections
       adminLocalitySummary: 'Locality',
@@ -231,11 +231,11 @@ const resources = {
       adminMemberLocality: 'Locality',
       adminApproveUser: 'Approve',
       adminPendingNote: 'Awaiting approval',
-      adminLocalityNotSet: 'Locality not configured. Contact a super admin.',
+      adminLocalityNotSet: 'Locality not configured. Contact the Master.',
       adminAllMembers: 'All Members',
 
-      // Super Admin
-      superAdminPanel: 'Super Admin Panel',
+      // Master (Super Admin)
+      superAdminPanel: 'Master Panel',
       localities: 'Localities',
       addLocality: 'Add Locality',
       editLocality: 'Edit Locality',
@@ -243,13 +243,22 @@ const resources = {
       localityAdded: 'Locality added!',
       localityUpdated: 'Locality updated!',
       localityDeleted: 'Locality deleted!',
-      assignAdmin: 'Assign Admin to Locality',
+      assignAdmin: 'Assign Organizer to Locality',
       noLocalities: 'No localities added yet.',
       localityCountry: 'Country',
       localityCity: 'City',
       localityArea: 'Area / District',
-      localityAdminIds: 'Admin Users',
+      localityAdminIds: 'Organizer Users',
       saveLocality: 'Save Locality',
+
+      // Friend attendance actions (post venue reveal)
+      confirmPresence: 'I\'ll be there ✅',
+      markLate: 'I\'ll be late ⏰',
+      presenceConfirmed: 'Presence confirmed!',
+      lateMarked: 'Marked as late!',
+      presenceStatus: 'Attendance Status',
+      bookedFriends: 'Booked Friends',
+      noBookedFriends: 'No friends have booked this event yet.',
 
       // Errors
       errorGeneral: 'Something went wrong. Please try again.',
@@ -369,14 +378,14 @@ const resources = {
 
       // Roles
       roleFriend: 'صديق',
-      roleAdmin: 'مشرف',
-      roleSuperAdmin: 'مشرف عام',
+      roleAdmin: 'منظّم',
+      roleSuperAdmin: 'ماستر',
 
       // Navigation
       dashboard: 'الرئيسية',
       profile: 'الملف الشخصي',
-      admin: 'الإدارة',
-      superAdmin: 'المشرف العام',
+      admin: 'المنظّم',
+      superAdmin: 'الماستر',
       events: 'الفعاليات',
 
       // Auth
@@ -417,7 +426,7 @@ const resources = {
       eventPublish: 'نشر الفعالية',
       eventSubmitApproval: 'إرسال للموافقة',
       eventPendingApproval: 'في انتظار الموافقة',
-      eventApprovalNote: 'هذه الفعالية بانتظار موافقة المشرف قبل أن تصبح مرئية للعامة.',
+      eventApprovalNote: 'هذه الفعالية بانتظار موافقة المنظّم قبل أن تصبح مرئية للعامة.',
       eventVenueHidden: 'سيُعلن عن المكان بعد الجدولة',
       eventEdit: 'تعديل الفعالية',
       eventCancel: 'إلغاء الفعالية',
@@ -545,7 +554,7 @@ const resources = {
       appealPending: 'الاستئناف قيد المراجعة',
 
       // Admin
-      adminPanel: 'لوحة التحكم',
+      adminPanel: 'لوحة المنظّم',
       manageEvents: 'إدارة الفعاليات',
       manageUsers: 'إدارة المستخدمين',
       manageLocations: 'إدارة المواقع',
@@ -554,8 +563,8 @@ const resources = {
       scheduling: 'الجدولة',
       runScheduling: 'تشغيل الجدولة الذكية',
       memberManagement: 'أعضاء المجتمع',
-      promoteToAdmin: 'ترقية لمشرف',
-      removeAdmin: 'إزالة دور المشرف',
+      promoteToAdmin: 'ترقية لمنظّم',
+      removeAdmin: 'إزالة دور المنظّم',
       blockMember: 'حظر',
       unblockMember: 'رفع الحظر',
       viewAppeals: 'الاستئنافات',
@@ -564,8 +573,8 @@ const resources = {
       noAppeals: 'لا توجد استئنافات معلقة.',
       memberBlocked: 'تم حظر العضو.',
       memberUnblocked: 'تم رفع الحظر عن العضو.',
-      memberPromoted: 'تمت ترقية العضو إلى مشرف.',
-      memberDemoted: 'تم إزالة دور المشرف.',
+      memberPromoted: 'تمت ترقية العضو إلى منظّم.',
+      memberDemoted: 'تم إزالة دور المنظّم.',
 
       // Admin page sections (AR)
       adminLocalitySummary: 'المنطقة',
@@ -586,11 +595,11 @@ const resources = {
       adminMemberLocality: 'المنطقة',
       adminApproveUser: 'موافقة',
       adminPendingNote: 'في انتظار الموافقة',
-      adminLocalityNotSet: 'لم يتم تكوين المنطقة. تواصل مع المشرف العام.',
+      adminLocalityNotSet: 'لم يتم تكوين المنطقة. تواصل مع الماستر.',
       adminAllMembers: 'جميع الأعضاء',
 
-      // Super Admin
-      superAdminPanel: 'لوحة المشرف العام',
+      // Master (Super Admin)
+      superAdminPanel: 'لوحة الماستر',
       localities: 'المناطق الإدارية',
       addLocality: 'إضافة منطقة',
       editLocality: 'تعديل منطقة',
@@ -598,13 +607,22 @@ const resources = {
       localityAdded: 'تمت إضافة المنطقة!',
       localityUpdated: 'تم تحديث المنطقة!',
       localityDeleted: 'تم حذف المنطقة!',
-      assignAdmin: 'تعيين مشرف للمنطقة',
+      assignAdmin: 'تعيين منظّم للمنطقة',
       noLocalities: 'لا توجد مناطق مضافة بعد.',
       localityCountry: 'الدولة',
       localityCity: 'المدينة',
       localityArea: 'الحي / المنطقة',
-      localityAdminIds: 'المشرفون',
+      localityAdminIds: 'منظّمو المنطقة',
       saveLocality: 'حفظ المنطقة',
+
+      // Friend attendance actions (post venue reveal)
+      confirmPresence: 'سأكون حاضراً ✅',
+      markLate: 'سأتأخر ⏰',
+      presenceConfirmed: 'تم تأكيد الحضور!',
+      lateMarked: 'تم تسجيل التأخر!',
+      presenceStatus: 'حالة الحضور',
+      bookedFriends: 'الأصدقاء المحجوزون',
+      noBookedFriends: 'لا يوجد أصدقاء محجوزون لهذه الفعالية بعد.',
 
       // Errors
       errorGeneral: 'حدث خطأ. يرجى المحاولة مجدداً.',

@@ -16,7 +16,7 @@ const ALL_INTERESTS = [
 
 function UserProfile({ onBack }) {
   const { t } = useTranslation();
-  const { currentUser, userProfile, updateUserProfile } = useAuth();
+  const { currentUser, userProfile, updateUserProfile, isAdmin } = useAuth();
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -470,6 +470,18 @@ function UserProfile({ onBack }) {
           {/* Locality */}
           <div className="form-section">
             <h3>📍 {t('locality')}</h3>
+            {/* Show organizer-assigned locality as read-only for admins/organizers */}
+            {isAdmin() && userProfile?.organizerLocalityId && (
+              <div className="form-group">
+                <label>{t('roleAdmin')} {t('locality')}</label>
+                <p className="organizer-locality-readonly">
+                  🏢 {userProfile.organizerLocalityLabel || userProfile.organizerLocalityId}
+                </p>
+                <small className="field-note">
+                  This locality is assigned by the Master and cannot be changed here.
+                </small>
+              </div>
+            )}
             <div className="form-group">
               <label htmlFor="localityId">{t('localitySelect')}</label>
               <select
@@ -485,6 +497,11 @@ function UserProfile({ onBack }) {
                   </option>
                 ))}
               </select>
+              {isAdmin() && (
+                <small className="field-note">
+                  This is your personal attendance locality (separate from your Organizer scope).
+                </small>
+              )}
             </div>
           </div>
 

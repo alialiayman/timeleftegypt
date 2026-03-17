@@ -264,6 +264,23 @@ const resources = {
       organizerLocalityNote: 'This locality is assigned by the Master and cannot be changed here.',
       attendanceLocalityNote: 'This is your personal attendance locality (separate from your Organizer scope).',
 
+      // Form actions
+      cancelForm: 'Cancel',
+      loadMore: 'Load more',
+      you: 'You',
+
+      // Validation
+      eventDatePast: 'Event date and time must be in the future.',
+
+      // Organizer event creation
+      eventLocalityReadOnly: 'Your locality is assigned by the Master and cannot be changed here.',
+
+      // Become an Organizer (landing page)
+      becomeOrganizerTitle: 'Become an Organizer',
+      becomeOrganizerSubtitle: 'We are looking for event organizers in the following locations:',
+      becomeOrganizerCTA: 'Apply via WhatsApp',
+      becomeOrganizerNoLocalities: 'All localities currently have organizers — check back soon!',
+
       // Errors
       errorGeneral: 'Something went wrong. Please try again.',
       errorAuth: 'Authentication failed.',
@@ -631,6 +648,23 @@ const resources = {
       // Organizer locality notes (profile page)
       organizerLocalityNote: 'هذه المنطقة معيّنة من قِبَل الماستر ولا يمكن تغييرها من هنا.',
       attendanceLocalityNote: 'هذه هي منطقة حضورك الشخصية (منفصلة عن نطاق عملك كمنظّم).',
+
+      // Form actions
+      cancelForm: 'إلغاء',
+      loadMore: 'تحميل المزيد',
+      you: 'أنت',
+
+      // Validation
+      eventDatePast: 'يجب أن يكون تاريخ ووقت الفعالية في المستقبل.',
+
+      // Organizer event creation
+      eventLocalityReadOnly: 'منطقتك معيّنة من قِبَل الماستر ولا يمكن تغييرها.',
+
+      // Become an Organizer (landing page)
+      becomeOrganizerTitle: 'كن منظّماً',
+      becomeOrganizerSubtitle: 'نبحث عن منظّمي فعاليات في المناطق التالية:',
+      becomeOrganizerCTA: 'تواصل عبر واتساب',
+      becomeOrganizerNoLocalities: 'جميع المناطق لديها منظّمون حالياً — تابعنا قريباً!',
 
       // Errors
       errorGeneral: 'حدث خطأ. يرجى المحاولة مجدداً.',

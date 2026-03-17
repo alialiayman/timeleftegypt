@@ -63,6 +63,8 @@ function AdminPanel({ onBack }) {
   users.forEach(u => { appealUsers[u.id] = u; });
 
   const handleToggleBlock = async (user) => {
+    // Guard: organizer cannot block themselves
+    if (user.id === userProfile?.id) return;
     setMemberLoading(user.id);
     try {
       await updateDoc(doc(db, 'users', user.id), {
@@ -78,6 +80,8 @@ function AdminPanel({ onBack }) {
   };
 
   const handleToggleAdmin = async (user) => {
+    // Guard: organizer cannot demote/remove themselves
+    if (user.id === userProfile?.id) return;
     setMemberLoading(user.id);
     try {
       const newRole = (user.role === 'admin' || user.role === 'event_admin') ? '' : 'admin';
@@ -156,22 +160,27 @@ function AdminPanel({ onBack }) {
       </div>
       <div className="member-actions">
         {!isSuperAdmin() && (user.role === 'super-admin') ? null : (
-          <>
-            <button
-              className={`btn btn-sm ${user.role === 'admin' || user.role === 'event_admin' ? 'btn-secondary' : 'btn-primary'}`}
-              onClick={() => handleToggleAdmin(user)}
-              disabled={memberLoading === user.id}
-            >
-              {user.role === 'admin' || user.role === 'event_admin' ? t('removeAdmin') : t('promoteToAdmin')}
-            </button>
-            <button
-              className={`btn btn-sm ${user.isBlocked ? 'btn-secondary' : 'btn-danger'}`}
-              onClick={() => handleToggleBlock(user)}
-              disabled={memberLoading === user.id}
-            >
-              {user.isBlocked ? t('unblockMember') : t('blockMember')}
-            </button>
-          </>
+          // Organizer cannot block or remove themselves
+          user.id === userProfile?.id ? (
+            <span className="self-badge">{t('you')}</span>
+          ) : (
+            <>
+              <button
+                className={`btn btn-sm ${user.role === 'admin' || user.role === 'event_admin' ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={() => handleToggleAdmin(user)}
+                disabled={memberLoading === user.id}
+              >
+                {user.role === 'admin' || user.role === 'event_admin' ? t('removeAdmin') : t('promoteToAdmin')}
+              </button>
+              <button
+                className={`btn btn-sm ${user.isBlocked ? 'btn-secondary' : 'btn-danger'}`}
+                onClick={() => handleToggleBlock(user)}
+                disabled={memberLoading === user.id}
+              >
+                {user.isBlocked ? t('unblockMember') : t('blockMember')}
+              </button>
+            </>
+          )
         )}
       </div>
     </div>

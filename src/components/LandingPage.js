@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../firebase';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 
 const STEPS = [
   { number: '01', titleKey: 'howItWorksStep1Title', descKey: 'howItWorksStep1Desc', icon: '📅' },
@@ -66,6 +68,21 @@ function LandingPage() {
   const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Localities that need organizers (adminIds is empty or missing)
+  const [localitiesNeedingOrganizers, setLocalitiesNeedingOrganizers] = useState([]);
+  useEffect(() => {
+    const q = query(collection(db, 'localities'));
+    const unsub = onSnapshot(q, (snap) => {
+      const needing = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(loc => !loc.adminIds || loc.adminIds.length === 0);
+      setLocalitiesNeedingOrganizers(needing);
+    }, (err) => {
+      console.error('Failed to load localities for organizer section:', err);
+    });
+    return unsub;
+  }, []);
 
   const isRTL = i18n.language === 'ar';
 
@@ -302,6 +319,37 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Become an Organizer ── */}
+      {localitiesNeedingOrganizers.length > 0 && (
+        <section id="lp-organizer" className="lp-section lp-organizer">
+          <div className="lp-container">
+            <div className="lp-organizer__inner">
+              <div className="lp-organizer__badge" aria-hidden="true">🎯</div>
+              <h2 className="lp-section__title">{t('becomeOrganizerTitle')}</h2>
+              <p className="lp-organizer__subtitle">{t('becomeOrganizerSubtitle')}</p>
+              <ul className="lp-organizer__localities">
+                {localitiesNeedingOrganizers.map(loc => (
+                  <li key={loc.id} className="lp-organizer__locality-item">
+                    <span className="lp-organizer__locality-icon" aria-hidden="true">📍</span>
+                    <span className="lp-organizer__locality-label">
+                      {[loc.country, loc.city, loc.area].filter(Boolean).join(' → ')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="https://wa.me/201508111337"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lp-btn lp-btn--primary lp-btn--lg lp-organizer__cta"
+              >
+                📱 {t('becomeOrganizerCTA')}
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Pricing ── */}
       <section id="lp-pricing" className="lp-section lp-pricing">

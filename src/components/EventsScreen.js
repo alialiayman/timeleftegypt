@@ -8,6 +8,7 @@ import {
   arrayUnion, arrayRemove, runTransaction, getDocs, documentId
 } from 'firebase/firestore';
 import { EVENT_TYPES, BOOKING_STATUS, createEvent, createBooking } from '../models';
+import { notifyLocalityMembersOfEvent } from '../services/emailService';
 
 const EVENT_TYPE_LABELS = {
   dinner: '🍽️ Dinner',
@@ -64,11 +65,21 @@ export default function EventsScreen() {
 
   const canCreate = !!(currentUser && userProfile);
 
+  // For organizers (admins), locality is derived from Master assignment
+  const organizerLocality = userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || '';
+
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', type: 'dinner',
     locality: '', locationName: '', dateTime: '',
     maxAttendees: '', price: 0, currency: 'EGP',
   });
+
+  // When an organizer opens the create form, pre-populate locality from assignment
+  useEffect(() => {
+    if (showCreateForm && isAdmin() && organizerLocality) {
+      setNewEvent(prev => ({ ...prev, locality: organizerLocality }));
+    }
+  }, [showCreateForm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load events
   useEffect(() => {
@@ -366,18 +377,35 @@ export default function EventsScreen() {
   /* ── Create Event ── */
   const handleCreateEvent = async (e) => {
     e.preventDefault();
+
+    // Validate: date/time must be in the future
+    if (newEvent.dateTime) {
+      const eventDate = new Date(newEvent.dateTime);
+      if (eventDate <= new Date()) {
+        showMessage(t('eventDatePast'));
+        return;
+      }
+    }
+
     try {
       const isFriend = !isAdmin();
+
+      // For organizers, always use the Master-assigned locality
+      const eventLocality = isAdmin()
+        ? (userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || newEvent.locality)
+        : newEvent.locality;
+
       const eventData = createEvent({
         ...newEvent,
+        locality: eventLocality,
         price: Number(newEvent.price),
         maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : null,
         dateTime: newEvent.dateTime ? new Date(newEvent.dateTime).toISOString() : '',
         status: isFriend ? 'pending_approval' : 'published',
         createdBy: currentUser.uid,
         createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString(),
-        venueLocation: newEvent.locationName, locationName: newEvent.locality,
-        locality: newEvent.locality, locationRevealed: false,
+        venueLocation: newEvent.locationName, locationName: eventLocality,
+        locationRevealed: false,
         schedulingCompleted: false, venueGroups: [], attendeeIds: [],
       });
       delete eventData.id;
@@ -385,7 +413,34 @@ export default function EventsScreen() {
       setShowCreateForm(false);
       setNewEvent({ title: '', description: '', type: 'dinner', locality: '', locationName: '', dateTime: '', maxAttendees: '', price: 0, currency: 'EGP' });
       showMessage(isFriend ? t('eventPendingApproval') : t('eventPublish'));
-    } catch (err) { showMessage(t('errorGeneral')); }
+
+      // Email locality members when a published event is created by an organizer
+      if (!isFriend && userProfile?.organizerLocalityId) {
+        try {
+          const membersSnap = await getDocs(
+            query(
+              collection(db, 'users'),
+              where('localityId', '==', userProfile.organizerLocalityId)
+            )
+          );
+          const members = membersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (members.length > 0) {
+            await notifyLocalityMembersOfEvent({
+              members,
+              eventTitle: eventData.title,
+              localityLabel: eventLocality,
+              eventDateTime: eventData.dateTime,
+            });
+          }
+        } catch (emailErr) {
+          // Non-fatal: log but don't disrupt the success flow
+          console.error('Failed to send locality member notifications:', emailErr);
+        }
+      }
+    } catch (err) {
+      console.error('Create event error:', err);
+      showMessage(t('errorGeneral'));
+    }
   };
 
   /* ── Helpers ── */
@@ -779,10 +834,19 @@ export default function EventsScreen() {
             </div>
             <div className="form-group">
               <label>{t('eventLocation')}</label>
-              <input type="text" value={newEvent.locality}
-                onChange={e => setNewEvent(p => ({ ...p, locality: e.target.value }))}
-                placeholder="e.g. Egypt Cairo New Cairo" />
-              <small>{t('eventVenueNote')}</small>
+              {isAdmin() && organizerLocality ? (
+                <>
+                  <input type="text" value={organizerLocality} readOnly className="input-readonly" />
+                  <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
+                </>
+              ) : (
+                <>
+                  <input type="text" value={newEvent.locality}
+                    onChange={e => setNewEvent(p => ({ ...p, locality: e.target.value }))}
+                    placeholder="e.g. Egypt Cairo New Cairo" />
+                  <small>{t('eventVenueNote')}</small>
+                </>
+              )}
             </div>
             <div className="form-group">
               <label>{t('eventVenue')}</label>
@@ -793,8 +857,13 @@ export default function EventsScreen() {
             </div>
             <div className="form-group">
               <label>{t('eventDate')}</label>
-              <input type="datetime-local" required value={newEvent.dateTime}
-                onChange={e => setNewEvent(p => ({ ...p, dateTime: e.target.value }))} />
+              <input
+                type="datetime-local"
+                required
+                value={newEvent.dateTime}
+                min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                onChange={e => setNewEvent(p => ({ ...p, dateTime: e.target.value }))}
+              />
             </div>
             <div className="form-row">
               <div className="form-group">

@@ -176,6 +176,9 @@ export function AuthProvider({ children }) {
         phoneNumber: profileData.phoneNumber !== undefined ? profileData.phoneNumber : currentProfile.phoneNumber || '',
         localityId: profileData.localityId !== undefined ? profileData.localityId : currentProfile.localityId || '',
         localityLabel: profileData.localityLabel !== undefined ? profileData.localityLabel : currentProfile.localityLabel || '',
+        // Organizer-assigned locality (set by Master; never overwritten by profile edits)
+        organizerLocalityId: currentProfile.organizerLocalityId || '',
+        organizerLocalityLabel: currentProfile.organizerLocalityLabel || '',
         photoURL: profileData.photoURL || currentProfile.photoURL || currentUser.photoURL || '',
         gender: profileData.gender !== undefined ? profileData.gender : currentProfile.gender || '',
         preferences: {

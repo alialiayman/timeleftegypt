@@ -99,6 +99,12 @@ export const createUser = (overrides = {}) => ({
   locationStatus: LOCATION_STATUS.PENDING,
   isBlocked: false,
   isAnonymous: false,
+  // Organizer-assigned locality (set by Master via locality management)
+  organizerLocalityId: '',
+  organizerLocalityLabel: '',
+  // User's personal attendance locality (chosen in profile)
+  localityId: '',
+  localityLabel: '',
   createdAt: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   ...overrides,
@@ -195,6 +201,10 @@ export const createBooking = (overrides = {}) => ({
   status: BOOKING_STATUS.PENDING,
   amountPaid: 0,
   paymentRef: null,
+  // Presence/late status after venue is revealed (set by friend)
+  presenceStatus: null, // 'confirmed_present' | 'going_late' | null
+  // Whether the friend actually attended the event (for future rating eligibility)
+  actuallyAttended: null, // true | false | null (null = not yet recorded)
   createdAt: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   ...overrides,

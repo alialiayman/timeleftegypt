@@ -17,9 +17,9 @@ function AdminPanel({ onBack }) {
   const [appealLoading, setAppealLoading] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
 
-  // The admin's own localityId / localityLabel
-  const adminLocalityId = userProfile?.localityId || '';
-  const adminLocalityLabel = userProfile?.localityLabel || userProfile?.city || t('adminLocalityNotSet');
+  // The organizer's locality scope is assigned by the Master (organizerLocalityId)
+  const adminLocalityId = userProfile?.organizerLocalityId || userProfile?.localityId || '';
+  const adminLocalityLabel = userProfile?.organizerLocalityLabel || userProfile?.localityLabel || userProfile?.city || t('adminLocalityNotSet');
 
   // Load pending appeals
   useEffect(() => {
@@ -114,7 +114,7 @@ function AdminPanel({ onBack }) {
   };
 
   const getRoleBadge = (user) => {
-    if (user.role === 'super-admin') return <span className="role-badge role-badge--super">Super Admin</span>;
+    if (user.role === 'super-admin') return <span className="role-badge role-badge--super">{t('roleSuperAdmin')}</span>;
     if (user.role === 'admin' || user.role === 'event_admin') return <span className="role-badge role-badge--admin">{t('roleAdmin')}</span>;
     return <span className="role-badge role-badge--friend">{t('roleFriend')}</span>;
   };

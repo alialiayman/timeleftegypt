@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
   collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-  orderBy
+  orderBy, writeBatch
 } from 'firebase/firestore';
 
 export default function SuperAdminPanel({ onBack }) {
@@ -54,6 +54,36 @@ export default function SuperAdminPanel({ onBack }) {
     setAdminSearch('');
   };
 
+  /**
+   * Sync organizerLocalityId on user documents whenever locality adminIds change.
+   * Added users get organizerLocalityId set; removed users get it cleared
+   * (only if it still points to this locality).
+   */
+  const syncOrganizerLocality = async (localityId, localityLabel, newAdminIds, oldAdminIds = []) => {
+    const batch = writeBatch(db);
+    const added = newAdminIds.filter(id => !oldAdminIds.includes(id));
+    const removed = oldAdminIds.filter(id => !newAdminIds.includes(id));
+
+    added.forEach(uid => {
+      batch.update(doc(db, 'users', uid), {
+        organizerLocalityId: localityId,
+        organizerLocalityLabel: localityLabel,
+        lastUpdated: new Date().toISOString(),
+      });
+    });
+    removed.forEach(uid => {
+      batch.update(doc(db, 'users', uid), {
+        organizerLocalityId: '',
+        organizerLocalityLabel: '',
+        lastUpdated: new Date().toISOString(),
+      });
+    });
+
+    if (added.length > 0 || removed.length > 0) {
+      await batch.commit();
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     try {
@@ -64,15 +94,21 @@ export default function SuperAdminPanel({ onBack }) {
         adminIds: form.adminIds,
         lastUpdated: new Date().toISOString(),
       };
+      const localityLabel = `${data.country} → ${data.city} → ${data.area}`;
 
       if (editingId) {
+        // Determine previous adminIds to sync changes
+        const prevLocality = localities.find(l => l.id === editingId);
+        const oldAdminIds = prevLocality?.adminIds || [];
         await updateDoc(doc(db, 'localities', editingId), data);
+        await syncOrganizerLocality(editingId, localityLabel, form.adminIds, oldAdminIds);
         showMsg(t('localityUpdated'));
       } else {
-        await addDoc(collection(db, 'localities'), {
+        const newRef = await addDoc(collection(db, 'localities'), {
           ...data,
           createdAt: new Date().toISOString(),
         });
+        await syncOrganizerLocality(newRef.id, localityLabel, form.adminIds, []);
         showMsg(t('localityAdded'));
       }
       handleCancelForm();
@@ -85,6 +121,11 @@ export default function SuperAdminPanel({ onBack }) {
   const handleDelete = async (id) => {
     if (!window.confirm(t('deleteLocality') + '?')) return;
     try {
+      // Clear organizerLocalityId for all admins assigned to this locality
+      const locality = localities.find(l => l.id === id);
+      if (locality?.adminIds?.length > 0) {
+        await syncOrganizerLocality(id, '', [], locality.adminIds);
+      }
       await deleteDoc(doc(db, 'localities', id));
       showMsg(t('localityDeleted'));
     } catch (err) {
@@ -113,8 +154,8 @@ export default function SuperAdminPanel({ onBack }) {
       <div className="admin-panel">
         <div className="access-denied">
           <h2>⛔ Access Denied</h2>
-          <p>You need Super Admin access for this panel.</p>
-          <button className="btn-primary" onClick={onBack}>
+          <p>You need Master access for this panel.</p>
+          <button className="btn btn-primary" onClick={onBack}>
             {t('dashboard')}
           </button>
         </div>
@@ -139,7 +180,7 @@ export default function SuperAdminPanel({ onBack }) {
           <div className="section-header-row">
             <h3>🌍 {t('localities')}</h3>
             <button
-              className="btn-primary btn-sm"
+              className="btn btn-primary btn-sm"
               onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}
             >
               + {t('addLocality')}
@@ -215,10 +256,10 @@ export default function SuperAdminPanel({ onBack }) {
                 </div>
 
                 <div className="form-actions">
-                  <button type="button" className="btn-secondary" onClick={handleCancelForm}>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancelForm}>
                     {t('eventCancel')}
                   </button>
-                  <button type="submit" className="btn-primary">
+                  <button type="submit" className="btn btn-primary">
                     {t('saveLocality')}
                   </button>
                 </div>
@@ -258,13 +299,13 @@ export default function SuperAdminPanel({ onBack }) {
                     </span>
                     <span className="row-actions">
                       <button
-                        className="btn-secondary btn-tiny"
+                        className="btn btn-secondary btn-sm"
                         onClick={() => handleEdit(loc)}
                       >
                         ✏️ {t('editLocality')}
                       </button>
                       <button
-                        className="btn-danger btn-tiny"
+                        className="btn btn-danger btn-sm"
                         onClick={() => handleDelete(loc.id)}
                       >
                         🗑️ {t('deleteLocality')}

@@ -548,7 +548,7 @@ export default function EventsScreen() {
     const event = selectedEvent;
     const isPending = event.status === 'pending_approval';
     const isOwner = event.createdBy === currentUser?.uid;
-    // Only owner or Master (super admin) may edit/delete; regular Organizers can only view events they don't own
+    // Only event owner or Master may edit/delete; regular Organizers can view but not modify events they don't own
     const canAdminEdit = isSuperAdmin() || isOwner;
     const bookingStatus = getBookingStatus(event.id);
     const isBooked = bookingStatus === BOOKING_STATUS.CONFIRMED;

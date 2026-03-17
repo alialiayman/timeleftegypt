@@ -478,7 +478,7 @@ function UserProfile({ onBack }) {
                   🏢 {userProfile.organizerLocalityLabel || userProfile.organizerLocalityId}
                 </p>
                 <small className="field-note">
-                  This locality is assigned by the Master and cannot be changed here.
+                  {t('organizerLocalityNote')}
                 </small>
               </div>
             )}
@@ -499,7 +499,7 @@ function UserProfile({ onBack }) {
               </select>
               {isAdmin() && (
                 <small className="field-note">
-                  This is your personal attendance locality (separate from your Organizer scope).
+                  {t('attendanceLocalityNote')}
                 </small>
               )}
             </div>

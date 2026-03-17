@@ -260,6 +260,10 @@ const resources = {
       bookedFriends: 'Booked Friends',
       noBookedFriends: 'No friends have booked this event yet.',
 
+      // Organizer locality notes (profile page)
+      organizerLocalityNote: 'This locality is assigned by the Master and cannot be changed here.',
+      attendanceLocalityNote: 'This is your personal attendance locality (separate from your Organizer scope).',
+
       // Errors
       errorGeneral: 'Something went wrong. Please try again.',
       errorAuth: 'Authentication failed.',
@@ -623,6 +627,10 @@ const resources = {
       presenceStatus: 'حالة الحضور',
       bookedFriends: 'الأصدقاء المحجوزون',
       noBookedFriends: 'لا يوجد أصدقاء محجوزون لهذه الفعالية بعد.',
+
+      // Organizer locality notes (profile page)
+      organizerLocalityNote: 'هذه المنطقة معيّنة من قِبَل الماستر ولا يمكن تغييرها من هنا.',
+      attendanceLocalityNote: 'هذه هي منطقة حضورك الشخصية (منفصلة عن نطاق عملك كمنظّم).',
 
       // Errors
       errorGeneral: 'حدث خطأ. يرجى المحاولة مجدداً.',

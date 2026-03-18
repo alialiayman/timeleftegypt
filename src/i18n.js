@@ -34,6 +34,9 @@ const resources = {
       myBookings: 'My Bookings',
       noEvents: 'No upcoming events',
       noRsvpdEvents: 'No upcoming booked events. Head to the Events tab to explore and book!',
+      localityEventsTitle: 'Events in Your Area',
+      noLocalityEvents: 'No upcoming events in your area.',
+      setLocalityPrompt: 'Set your area in your profile to discover local events.',
       bookEvent: 'Book',
       cancelBooking: 'Cancel Booking',
       addInterest: 'Add Interest',
@@ -274,6 +277,7 @@ const resources = {
 
       // Organizer event creation
       eventLocalityReadOnly: 'Your locality is assigned by the Master and cannot be changed here.',
+      organizerNoLocality: 'No locality assigned. Contact the Master to assign a locality to your account.',
 
       // Become an Organizer (landing page)
       becomeOrganizerTitle: 'Become an Organizer',
@@ -419,6 +423,9 @@ const resources = {
       myBookings: 'حجوزاتي',
       noEvents: 'لا توجد فعاليات قادمة',
       noRsvpdEvents: 'لا توجد فعاليات محجوزة قادمة. توجّه إلى تبويب الفعاليات للاستكشاف والحجز!',
+      localityEventsTitle: 'الفعاليات في منطقتك',
+      noLocalityEvents: 'لا توجد فعاليات قادمة في منطقتك.',
+      setLocalityPrompt: 'حدّد منطقتك في ملفك الشخصي لاستكشاف الفعاليات المحلية.',
       bookEvent: 'احجز',
       cancelBooking: 'إلغاء الحجز',
       addInterest: 'أضف اهتماماً',
@@ -659,6 +666,7 @@ const resources = {
 
       // Organizer event creation
       eventLocalityReadOnly: 'منطقتك معيّنة من قِبَل الماستر ولا يمكن تغييرها.',
+      organizerNoLocality: 'لم تُعيَّن لك منطقة. تواصل مع الماستر لتعيين منطقة لحسابك.',
 
       // Become an Organizer (landing page)
       becomeOrganizerTitle: 'كن منظّماً',

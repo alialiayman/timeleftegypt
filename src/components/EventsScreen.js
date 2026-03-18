@@ -382,6 +382,12 @@ export default function EventsScreen() {
   const handleCreateEvent = async (e) => {
     e.preventDefault();
 
+    // Validate: organizers must have a locality assigned
+    if (isAdmin() && !organizerLocality) {
+      showMessage(t('organizerNoLocality'));
+      return;
+    }
+
     // Validate: date/time must be in the future
     if (newEvent.dateTime) {
       const eventDate = new Date(newEvent.dateTime);
@@ -396,7 +402,7 @@ export default function EventsScreen() {
 
       // For organizers, always use the Master-assigned locality
       const eventLocality = isAdmin()
-        ? (userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || newEvent.locality)
+        ? (userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || '')
         : newEvent.locality;
 
       const eventData = createEvent({
@@ -563,11 +569,15 @@ export default function EventsScreen() {
             </div>
             <div className="form-group">
               <label>{t('eventLocation')}</label>
-              {isAdmin() && organizerLocality ? (
-                <>
-                  <input type="text" value={organizerLocality} readOnly className="input-readonly" />
-                  <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
-                </>
+              {isAdmin() ? (
+                organizerLocality ? (
+                  <>
+                    <input type="text" value={organizerLocality} readOnly className="input-readonly" />
+                    <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
+                  </>
+                ) : (
+                  <p className="info-note">⚠️ {t('organizerNoLocality')}</p>
+                )
               ) : (
                 <input type="text" value={editForm.locality}
                   onChange={e => setEditForm(p => ({ ...p, locality: e.target.value }))}
@@ -851,11 +861,15 @@ export default function EventsScreen() {
             </div>
             <div className="form-group">
               <label>{t('eventLocation')}</label>
-              {isAdmin() && organizerLocality ? (
-                <>
-                  <input type="text" value={organizerLocality} readOnly className="input-readonly" />
-                  <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
-                </>
+              {isAdmin() ? (
+                organizerLocality ? (
+                  <>
+                    <input type="text" value={organizerLocality} readOnly className="input-readonly" />
+                    <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
+                  </>
+                ) : (
+                  <p className="info-note">⚠️ {t('organizerNoLocality')}</p>
+                )
               ) : (
                 <>
                   <input type="text" value={newEvent.locality}

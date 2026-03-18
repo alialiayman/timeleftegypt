@@ -1,4 +1,379 @@
-# ⏰ TimeLeft Reconnect
+# 🎉 Gatherly
+
+**Gatherly** is a locality-based social event platform for Egypt. It connects people through curated real-world experiences — dinners, movie nights, coffee meetups, and more — organized by community leaders called **Organizers** and overseen by a system administrator called the **Master**.
+
+---
+
+## 📖 Table of Contents
+
+1. [Overview](#overview)
+2. [Roles](#roles)
+3. [How Locality Works](#how-locality-works)
+4. [Major Flows](#major-flows)
+5. [Screenshots](#screenshots)
+6. [Architecture](#architecture)
+7. [Setup & Running](#setup--running)
+8. [Deployment](#deployment)
+
+---
+
+## Overview
+
+Gatherly brings people together through events tied to geographic localities (e.g., Egypt → Cairo → New Cairo). The platform is designed for three types of users:
+
+- **Master** — the system administrator who configures localities and assigns Organizers.
+- **Organizer** — a community leader who creates and manages events within their assigned locality.
+- **Friend** — a regular user who discovers and books events in their chosen area.
+
+Events are locality-scoped: an Organizer's events automatically belong to their assigned locality, and a Friend sees only events from the locality they've chosen in their profile.
+
+---
+
+## Roles
+
+### 🔑 Master (Super Admin)
+
+The Master has full control over the system. Their responsibilities include:
+
+- **Creating and managing localities** — Each locality is defined by a country, city, and area/district (e.g., Egypt → Cairo → New Cairo).
+- **Assigning Organizers to localities** — When a user is assigned as an Organizer for a locality, their account is automatically updated with that locality's ID and label.
+- **Managing all users** — Can view, block, or unblock any user.
+- **Overseeing all events** — Can see all events regardless of status or locality.
+
+The Master panel is the source of truth for which Organizer manages which locality.
+
+---
+
+### 🎟️ Organizer (Event Admin)
+
+An Organizer is a user assigned by the Master to manage a specific locality. Their responsibilities include:
+
+- **Creating events** — Events created by an Organizer are automatically published with their Master-assigned locality. The Organizer cannot change the locality.
+- **Managing their events** — Edit, cancel, or schedule events within their locality.
+- **Revealing venues** — After scheduling, the Organizer reveals the venue to booked attendees.
+- **Managing attendees** — View booked Friends, send notifications.
+
+> **Important:** An Organizer's event locality is **always inherited** from the Master's assignment. The Organizer cannot edit it — it appears as a read-only field in the event creation form.
+
+---
+
+### 👥 Friend (Regular User)
+
+A Friend is a regular member of the community. Their experience includes:
+
+- **Setting their locality** — In their profile, a Friend selects the locality they want to browse events for (e.g., Egypt → Cairo → New Cairo).
+- **Discovering events** — The Dashboard and Events tab both show published events from the Friend's chosen locality only.
+- **Booking events** — Friends can RSVP to events and see their bookings on the Dashboard.
+- **Submitting events** — Friends can submit event suggestions (pending Organizer approval).
+- **Rating events** — After events, Friends can rate their experience.
+
+---
+
+## How Locality Works
+
+Locality is a hierarchical geographic identifier in the format:
+
+```
+Egypt → Cairo → New Cairo
+```
+
+### Organizer Locality
+
+1. The Master creates a locality record (country → city → area).
+2. The Master assigns one or more users as Organizers for that locality.
+3. When assigned, the user's profile is automatically updated with:
+   - `organizerLocalityId` — the Firestore ID of the locality document
+   - `organizerLocalityLabel` — the human-readable label (e.g., "Egypt → Cairo → New Cairo")
+4. When an Organizer creates an event, the event's `locality` field is set to `organizerLocalityLabel`.
+5. The locality field is **read-only** in the event creation form — Organizers cannot change it.
+
+### Friend Locality
+
+1. A Friend selects their area in their profile (from the list of active localities).
+2. Their profile is updated with:
+   - `localityId` — the Firestore ID of the locality document
+   - `localityLabel` — the human-readable label (e.g., "Egypt → Cairo → New Cairo")
+3. The Dashboard and Events tab filter events using `event.locality === userProfile.localityLabel`.
+4. Only published events from the Friend's chosen locality are shown.
+
+### Why these are separate
+
+- `organizerLocalityId` / `organizerLocalityLabel` → controls which area an Organizer manages (set by Master, not editable by the Organizer).
+- `localityId` / `localityLabel` → controls which events a Friend sees (set by the Friend in their profile).
+
+These fields are intentionally separate and must not be confused or mixed.
+
+---
+
+## Major Flows
+
+### 1. Assigning an Organizer to a Locality
+
+```
+Master → Super Admin Panel → Localities
+  → Create or Edit locality (country, city, area)
+  → Assign user(s) as Organizer
+  → Save
+  → System writes organizerLocalityId + organizerLocalityLabel to the user's Firestore doc
+  → Organizer receives email notification
+```
+
+### 2. Organizer Creates an Event
+
+```
+Organizer → Events tab → Create Event
+  → Fills in title, description, type, date, venue, price
+  → Locality is shown as read-only (inherited from Master assignment)
+  → Submits
+  → Event is saved to Firestore with status = "published" and locality = organizerLocalityLabel
+  → Email sent to all Friends in that locality
+```
+
+### 3. Friend Browses Events
+
+```
+Friend → Profile → Select Locality
+  → Saves localityId + localityLabel to their profile
+
+Friend → Dashboard
+  → "Events in Your Area" section shows upcoming published events in their locality
+  → "Upcoming RSVP'd Events" section shows events they've booked
+
+Friend → Events tab
+  → Shows all published events filtered by their profile locality
+  → Can book events directly from here
+```
+
+### 4. Locality-Based Visibility
+
+- Only events where `event.locality === userProfile.localityLabel` are shown to a Friend.
+- Events from other localities are not shown in Friend-facing views.
+- Organizers and Masters see all events regardless of locality.
+
+---
+
+## Screenshots
+
+### Master Panel — Locality Management
+
+![Master Panel](docs/screenshots/master-panel.png)
+
+*The Master creates localities and assigns Organizers. Each locality entry shows the country, city, and area.*
+
+---
+
+### Organizer Event Creation — Read-Only Locality
+
+![Organizer Event Creation](docs/screenshots/organizer-create-event.png)
+
+*When an Organizer creates an event, the Locality field is read-only. It is inherited from their Master-assigned locality and cannot be changed.*
+
+---
+
+### Friend Dashboard — Events in Your Area
+
+![Friend Dashboard](docs/screenshots/friend-dashboard.png)
+
+*The Friend's dashboard shows two sections: "Events in Your Area" (locality-filtered discovery) and "Upcoming RSVP'd Events" (booked events).*
+
+---
+
+### Friend Events Tab — Locality-Filtered List
+
+![Friend Events Tab](docs/screenshots/friend-events-tab.png)
+
+*The Events tab shows all published events in the Friend's chosen locality. Friends can book directly from this view.*
+
+---
+
+### Friend Profile — Locality Selection
+
+![Friend Profile Locality](docs/screenshots/friend-profile-locality.png)
+
+*Friends select their area in the profile page. This controls which events they see on the Dashboard and Events tab.*
+
+---
+
+## Architecture
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19.x (Create React App) |
+| State Management | React Context API (`AuthContext`) |
+| Backend | Firebase (Firestore, Auth, Storage) |
+| Database | Firestore (NoSQL, real-time) |
+| Authentication | Google Sign-In + Anonymous |
+| Storage | Firebase Storage (profile photos) |
+| Internationalization | i18next (English + Arabic) |
+
+### Component Structure
+
+```
+src/
+├── components/
+│   ├── SuperAdminPanel.js   # Master: locality management, organizer assignment
+│   ├── AdminPanel.js        # Organizer: member management, event oversight
+│   ├── EventsScreen.js      # Event creation (organizer) and discovery (friend)
+│   ├── Dashboard.js         # Friend dashboard with locality-filtered events
+│   ├── UserProfile.js       # Profile editing, locality selection (friend)
+│   ├── LoginForm.js         # Authentication
+│   ├── LandingPage.js       # Public landing page
+│   ├── RatingFlow.js        # Post-event ratings
+│   └── InterestsEditor.js   # Interest tags editor
+├── contexts/
+│   └── AuthContext.js       # Auth state, user profile, role helpers
+├── services/
+│   ├── emailService.js      # Email notifications (organizer assignment, events)
+│   └── aiScheduling.js      # AI-powered event scheduling
+├── models/
+│   └── index.js             # Data models, enums, factory functions
+├── firebase.js              # Firebase config
+├── i18n.js                  # Translations (en/ar)
+└── App.js                   # Root component, navigation
+```
+
+### Key Data Models
+
+**User Profile (`users/{uid}`)**
+```javascript
+{
+  role: 'super_admin' | 'event_admin' | 'friend',
+
+  // Organizer-specific (set by Master)
+  organizerLocalityId: 'firestore-locality-doc-id',
+  organizerLocalityLabel: 'Egypt → Cairo → New Cairo',
+
+  // Friend-specific (set by Friend in profile)
+  localityId: 'firestore-locality-doc-id',
+  localityLabel: 'Egypt → Cairo → New Cairo',
+}
+```
+
+**Event (`events/{eventId}`)**
+```javascript
+{
+  title: 'Friday Movie Night',
+  type: 'movie_night',
+  locality: 'Egypt → Cairo → New Cairo',  // inherited from Organizer
+  status: 'published' | 'pending_approval' | 'cancelled' | 'completed',
+  createdBy: 'organizer-uid',
+  dateTime: '2025-11-01T19:00:00.000Z',
+  price: 150,
+  currency: 'EGP',
+}
+```
+
+**Locality (`localities/{localityId}`)**
+```javascript
+{
+  country: 'Egypt',
+  city: 'Cairo',
+  area: 'New Cairo',
+  adminIds: ['organizer-uid-1', 'organizer-uid-2'],
+}
+```
+
+---
+
+## Setup & Running
+
+### Prerequisites
+
+- Node.js v14 or higher
+- A Firebase project with Authentication (Google + Anonymous), Firestore, and Storage enabled
+
+### Installation
+
+```bash
+git clone <repository-url>
+cd timeleftegypt
+npm install
+```
+
+### Firebase Configuration
+
+Update `src/firebase.js` with your Firebase project credentials:
+
+```javascript
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID",
+};
+```
+
+### Start Development Server
+
+```bash
+npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Initial Setup
+
+1. Sign in with Google.
+2. In Firestore, manually set your user document's `role` field to `super_admin` to become the Master.
+3. Create localities in the Super Admin Panel.
+4. Assign users as Organizers for each locality.
+
+---
+
+## Deployment
+
+### Firebase Hosting
+
+```bash
+npm run build
+firebase deploy
+```
+
+### Other Platforms
+
+The app builds to a static bundle and can be deployed to Netlify, Vercel, AWS Amplify, or any static hosting service.
+
+---
+
+## Firestore Security Rules (Recommended)
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own profile
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Events: public read for published, write restricted to organizers
+    match /events/{eventId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['event_admin', 'super_admin'];
+    }
+    // Bookings
+    match /bookings/{bookingId} {
+      allow read, write: if request.auth != null;
+    }
+    // Localities: read by all, write by super_admin only
+    match /localities/{localityId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+  }
+}
+```
+
+---
+
+Built with ❤️ for better community connections.
+
 
 A modern web application for automatically assigning TimeLeft members to tables for reconnection events. Built with React and Firebase, this system helps organize small to medium-sized gatherings (2-25 people) by intelligently distributing participants across tables.
 

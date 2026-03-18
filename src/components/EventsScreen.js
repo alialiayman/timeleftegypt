@@ -70,7 +70,7 @@ export default function EventsScreen() {
 
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', type: 'dinner',
-    locality: '', locationName: '', dateTime: '',
+    locality: '', dateTime: '',
     maxAttendees: '', price: 0, currency: 'EGP',
   });
 
@@ -277,7 +277,6 @@ export default function EventsScreen() {
       description: event.description || '',
       type: event.type || 'dinner',
       locality: event.locality || '',
-      locationName: event.venueLocation || event.locationName || '',
       dateTime: event.dateTime ? event.dateTime.slice(0, 16) : '',
       maxAttendees: event.maxAttendees || '',
       price: event.price ?? 0,
@@ -297,7 +296,7 @@ export default function EventsScreen() {
       await updateDoc(doc(db, 'events', selectedEvent.id), {
         title: editForm.title, description: editForm.description,
         type: editForm.type, locality: persistedLocality,
-        venueLocation: editForm.locationName, locationName: persistedLocality,
+        locationName: persistedLocality,
         dateTime: editForm.dateTime ? new Date(editForm.dateTime).toISOString() : selectedEvent.dateTime,
         maxAttendees: editForm.maxAttendees ? Number(editForm.maxAttendees) : null,
         price: Number(editForm.price), currency: editForm.currency,
@@ -404,24 +403,28 @@ export default function EventsScreen() {
       const eventLocality = isAdmin()
         ? (userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || '')
         : newEvent.locality;
+      const eventLocalityId = isAdmin()
+        ? (userProfile?.organizerLocalityId || '')
+        : '';
 
       const eventData = createEvent({
         ...newEvent,
         locality: eventLocality,
+        localityId: eventLocalityId,
         price: Number(newEvent.price),
         maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : null,
         dateTime: newEvent.dateTime ? new Date(newEvent.dateTime).toISOString() : '',
         status: isFriend ? 'pending_approval' : 'published',
         createdBy: currentUser.uid,
         createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString(),
-        venueLocation: newEvent.locationName, locationName: eventLocality,
+        locationName: eventLocality,
         locationRevealed: false,
         schedulingCompleted: false, venueGroups: [], attendeeIds: [],
       });
       delete eventData.id;
       await addDoc(collection(db, 'events'), eventData);
       setShowCreateForm(false);
-      setNewEvent({ title: '', description: '', type: 'dinner', locality: '', locationName: '', dateTime: '', maxAttendees: '', price: 0, currency: 'EGP' });
+      setNewEvent({ title: '', description: '', type: 'dinner', locality: '', dateTime: '', maxAttendees: '', price: 0, currency: 'EGP' });
       showMessage(isFriend ? t('eventPendingApproval') : t('eventPublish'));
 
       // Email locality members when a published event is created by an organizer
@@ -457,7 +460,7 @@ export default function EventsScreen() {
   const spotsLeft = (event) => event.maxAttendees ? event.maxAttendees - (event.currentAttendees || 0) : null;
   const getBookingStatus = (eventId) => myBookings[eventId]?.status;
   const getLocationDisplay = (event) => {
-    if (isAdmin()) return event.venueLocation || event.locationName || '—';
+    if (isAdmin()) return event.locality || event.locationName || '—';
     if (event.locationRevealed) return event.locationName || '—';
     return event.locality || t('eventVenueHidden');
   };
@@ -466,13 +469,21 @@ export default function EventsScreen() {
     return event.venueGroups.find(g => g.attendeeIds?.includes(currentUser.uid)) || null;
   };
 
-  // For Friends (non-admin), filter published events to their own locality
+  // For Friends (non-admin), filter published events to their own locality.
+  // Match by localityId (preferred, more robust) or fall back to label comparison.
   const userLocality = !isAdmin() ? (userProfile?.localityLabel || '') : '';
+  const userLocalityId = !isAdmin() ? (userProfile?.localityId || '') : '';
+
+  const eventMatchesUserLocality = (ev) => {
+    if (!userLocality && !userLocalityId) return true;
+    if (userLocalityId && ev.localityId) return ev.localityId === userLocalityId;
+    return !!userLocality && ev.locality === userLocality;
+  };
 
   const allVisibleEvents = isAdmin()
     ? events
     : [
-        ...events.filter(ev => !userLocality || ev.locality === userLocality),
+        ...events.filter(ev => eventMatchesUserLocality(ev)),
         ...myPendingEvents.filter(pe => !events.some(e => e.id === pe.id)),
       ];
 
@@ -583,12 +594,6 @@ export default function EventsScreen() {
                   onChange={e => setEditForm(p => ({ ...p, locality: e.target.value }))}
                   placeholder="e.g. Egypt Cairo New Cairo" />
               )}
-            </div>
-            <div className="form-group">
-              <label>{t('eventVenue')}</label>
-              <input type="text" value={editForm.locationName}
-                onChange={e => setEditForm(p => ({ ...p, locationName: e.target.value }))}
-                placeholder="e.g. Cinema ABC (internal only)" />
             </div>
             <div className="form-group">
               <label>{t('eventDate')}</label>
@@ -878,13 +883,6 @@ export default function EventsScreen() {
                   <small>{t('eventVenueNote')}</small>
                 </>
               )}
-            </div>
-            <div className="form-group">
-              <label>{t('eventVenue')}</label>
-              <input type="text" value={newEvent.locationName}
-                onChange={e => setNewEvent(p => ({ ...p, locationName: e.target.value }))}
-                placeholder="e.g. Cinema ABC (internal only)" />
-              <small className="venue-note">🔒 {t('eventVenueNote')}</small>
             </div>
             <div className="form-group">
               <label>{t('eventDate')}</label>

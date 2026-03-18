@@ -100,7 +100,8 @@ function Dashboard({ setCurrentView }) {
   // Load published events in the Friend's chosen locality
   useEffect(() => {
     const userLocality = userProfile?.localityLabel || '';
-    if (!userLocality) {
+    const userLocalityId = userProfile?.localityId || '';
+    if (!userLocality && !userLocalityId) {
       setLocalityEvents([]);
       setLocalityEventsLoading(false);
       return;
@@ -115,15 +116,18 @@ function Dashboard({ setCurrentView }) {
 
     const unsub = onSnapshot(q, (snap) => {
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const filtered = all.filter(
-        ev => ev.locality === userLocality && ev.dateTime && ev.dateTime >= now
-      );
+      const filtered = all.filter(ev => {
+        if (!ev.dateTime || ev.dateTime < now) return false;
+        // Match by localityId (preferred, more robust) or fall back to label comparison
+        if (userLocalityId && ev.localityId) return ev.localityId === userLocalityId;
+        return !!userLocality && ev.locality === userLocality;
+      });
       setLocalityEvents(filtered);
       setLocalityEventsLoading(false);
     }, () => setLocalityEventsLoading(false));
 
     return unsub;
-  }, [userProfile?.localityLabel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userProfile?.localityLabel, userProfile?.localityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     if (window.confirm(t('logout') + '?')) {
@@ -224,7 +228,7 @@ function Dashboard({ setCurrentView }) {
       <div className="events-section">
         <h3>📍 {t('localityEventsTitle')}</h3>
 
-        {!userProfile?.localityLabel ? (
+        {!userProfile?.localityLabel && !userProfile?.localityId ? (
           <div className="empty-state">
             <p>{t('setLocalityPrompt')}</p>
             <button

@@ -404,6 +404,47 @@ body {
   gap: 2rem;
 }
 
+/* ---- Connection Notifications on Dashboard ---- */
+.connection-notification-banner {
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  color: #1d4ed8;
+}
+
+.accepted-connections-section {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.accepted-connections-section h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 0.75rem;
+}
+
+.accepted-connection-item {
+  background: white;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.accepted-connection-item p {
+  font-size: 0.9rem;
+  color: #166534;
+  margin-bottom: 0.5rem;
+}
+
 .dashboard-header {
   background: white;
   border-radius: 16px;
@@ -4556,6 +4597,120 @@ body {
 .connect-pending { background: #fef3c7; color: #92400e; }
 .connect-approved { background: #d1fae5; color: #065f46; }
 .connect-rejected { background: #fee2e2; color: #991b1b; }
+
+/* ---- Face Rating ---- */
+.face-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.face-rating-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.face-btn {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  opacity: 0.55;
+}
+.face-btn:hover {
+  transform: scale(1.2);
+  opacity: 1;
+}
+.face-btn.face-selected {
+  border-color: #7c3aed;
+  opacity: 1;
+  transform: scale(1.15);
+}
+.face-btn:disabled {
+  cursor: default;
+}
+
+/* ---- Connect Request (extended) ---- */
+.connect-status-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.phone-reveal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.phone-number {
+  font-size: 0.9rem;
+  color: #166534;
+}
+
+.whatsapp-btn {
+  background: #22c55e;
+  color: white;
+  border: none;
+}
+.whatsapp-btn:hover { background: #16a34a; }
+
+/* ---- Incoming Connection Requests ---- */
+.incoming-requests-section {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.incoming-requests-section h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 1rem;
+}
+
+.incoming-requests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.incoming-request-item {
+  background: white;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.request-msg {
+  font-size: 0.85rem;
+  color: #1e40af;
+  margin: 2px 0 0;
+}
+
+.request-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
 
 .empty-state-text {
   color: #78716c;

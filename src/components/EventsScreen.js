@@ -75,10 +75,22 @@ export default function EventsScreen() {
     maxAttendees: '', price: 0, currency: 'EGP',
   });
 
-  // When an organizer opens the create form, pre-populate locality from assignment
+  // When the create form is opened, pre-populate locality:
+  // - For organizers: from their Master-assigned locality
+  // - For friends: from their profile locality
   useEffect(() => {
-    if (showCreateForm && isAdmin() && organizerLocality) {
+    if (!showCreateForm) return;
+    if (isAdmin() && organizerLocality) {
       setNewEvent(prev => ({ ...prev, locality: organizerLocality }));
+    } else if (!isAdmin()) {
+      const friendLocality = userProfile?.localityLabel || '';
+      const friendLocalityId = userProfile?.localityId || '';
+      // Only pre-fill if we have a real locality label (not just an id)
+      if (friendLocality && friendLocalityId) {
+        setNewEvent(prev => ({ ...prev, locality: friendLocality, localityId: friendLocalityId }));
+      } else if (friendLocality) {
+        setNewEvent(prev => ({ ...prev, locality: friendLocality }));
+      }
     }
   }, [showCreateForm]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -206,14 +218,12 @@ export default function EventsScreen() {
         createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString(),
       });
       delete bookingData.id;
+      // Capacity overflow is allowed: bookings continue past maxAttendees.
+      // The scheduler will later assign overflow attendees to additional venues.
       await runTransaction(db, async (transaction) => {
         const eventRef = doc(db, 'events', event.id);
         const eventSnap = await transaction.get(eventRef);
         if (!eventSnap.exists()) throw new Error('Event not found');
-        const data = eventSnap.data();
-        const current = data.currentAttendees || 0;
-        const max = data.maxAttendees;
-        if (max && current >= max) throw new Error('Event is fully booked');
         transaction.update(eventRef, {
           currentAttendees: increment(1),
           attendeeIds: arrayUnion(currentUser.uid),
@@ -223,8 +233,7 @@ export default function EventsScreen() {
       await addDoc(collection(db, 'bookings'), bookingData);
       showMessage(t('bookingSuccess'));
     } catch (err) {
-      if (err.message === 'Event is fully booked') showMessage(t('fullyBooked'));
-      else showMessage(t('errorBooking'));
+      showMessage(t('errorBooking'));
     } finally {
       setBookingLoading(null);
     }
@@ -410,13 +419,14 @@ export default function EventsScreen() {
     try {
       const isFriend = !isAdmin();
 
-      // For organizers, always use the Master-assigned locality
+      // For organizers, always use the Master-assigned locality.
+      // For friends, use their profile locality (pre-filled) or what they entered.
       const eventLocality = isAdmin()
         ? (userProfile?.organizerLocalityLabel || userProfile?.organizerLocalityId || '')
-        : newEvent.locality;
+        : (newEvent.locality || userProfile?.localityLabel || '');
       const eventLocalityId = isAdmin()
         ? (userProfile?.organizerLocalityId || '')
-        : '';
+        : (newEvent.localityId || userProfile?.localityId || '');
 
       const eventData = createEvent({
         ...newEvent,
@@ -653,10 +663,10 @@ export default function EventsScreen() {
     const canAdminEdit = isSuperAdmin() || isOwner;
     const bookingStatus = getBookingStatus(event.id);
     const isBooked = bookingStatus === BOOKING_STATUS.CONFIRMED;
-    const left = spotsLeft(event);
-    const isFull = left !== null && left <= 0;
     const assignedVenue = getAssignedVenueGroup(event);
     const myBooking = myBookings[event.id];
+    // isFriendView: the current user is a non-admin viewer (not the event owner either)
+    const isFriendView = !isAdmin() && !isOwner;
 
     return (
       <div className="events-screen">
@@ -695,33 +705,38 @@ export default function EventsScreen() {
                 <span className="detail-label">💰 {t('eventPriceLabel')}</span>
                 <span className="detail-value">{event.price === 0 ? t('eventFree') : (event.price + ' ' + event.currency)}</span>
               </div>
-              <div className="detail-row">
-                <span className="detail-label">👥 {t('eventAttendeesLabel')}</span>
-                <span className="detail-value">
-                  {event.currentAttendees || 0}{event.maxAttendees ? (' / ' + event.maxAttendees) : ''}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">🔖 {t('eventApprovalStatus')}</span>
-                <span className={'status-badge status-badge--' + event.status}>
-                  {event.status === 'published' ? ('✅ ' + t('locationApproved'))
-                    : event.status === 'pending_approval' ? ('⏳ ' + t('eventPendingApproval'))
-                    : event.status === 'cancelled' ? ('❌ ' + t('bookingCancelled'))
-                    : event.status}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">📋 {t('eventScheduleStatus')}</span>
-                <span className={'status-badge ' + (event.schedulingCompleted ? 'status-badge--published' : 'status-badge--pending_approval')}>
-                  {event.schedulingCompleted ? ('✅ ' + t('eventScheduled')) : ('⏳ ' + t('eventNotScheduled'))}
-                </span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">🏠 {t('eventVenueRevealStatus')}</span>
-                <span className={'status-badge ' + (event.locationRevealed ? 'status-badge--published' : 'status-badge--pending_approval')}>
-                  {event.locationRevealed ? ('✅ ' + t('eventVenueRevealed')) : ('🔒 ' + t('eventVenueNotRevealed'))}
-                </span>
-              </div>
+              {/* Organizer-only fields: hidden from Friends */}
+              {!isFriendView && (
+                <>
+                  <div className="detail-row">
+                    <span className="detail-label">👥 {t('eventAttendeesLabel')}</span>
+                    <span className="detail-value">
+                      {event.currentAttendees || 0}{event.maxAttendees ? (' / ' + event.maxAttendees) : ''}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">🔖 {t('eventApprovalStatus')}</span>
+                    <span className={'status-badge status-badge--' + event.status}>
+                      {event.status === 'published' ? ('✅ ' + t('locationApproved'))
+                        : event.status === 'pending_approval' ? ('⏳ ' + t('eventPendingApproval'))
+                        : event.status === 'cancelled' ? ('❌ ' + t('bookingCancelled'))
+                        : event.status}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">📋 {t('eventScheduleStatus')}</span>
+                    <span className={'status-badge ' + (event.schedulingCompleted ? 'status-badge--published' : 'status-badge--pending_approval')}>
+                      {event.schedulingCompleted ? ('✅ ' + t('eventScheduled')) : ('⏳ ' + t('eventNotScheduled'))}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-label">🏠 {t('eventVenueRevealStatus')}</span>
+                    <span className={'status-badge ' + (event.locationRevealed ? 'status-badge--published' : 'status-badge--pending_approval')}>
+                      {event.locationRevealed ? ('✅ ' + t('eventVenueRevealed')) : ('🔒 ' + t('eventVenueNotRevealed'))}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {!isAdmin() && isBooked && event.locationRevealed && assignedVenue && (
@@ -829,8 +844,8 @@ export default function EventsScreen() {
                 ) : (
                   <button className="btn btn-primary"
                     onClick={() => handleBookEvent(event)}
-                    disabled={isFull || bookingLoading === event.id || userProfile?.isBlocked}>
-                    {bookingLoading === event.id ? '...' : isFull ? t('fullyBooked') : t('bookEvent')}
+                    disabled={bookingLoading === event.id || userProfile?.isBlocked}>
+                    {bookingLoading === event.id ? '...' : t('bookEvent')}
                   </button>
                 )
               )}
@@ -895,6 +910,17 @@ export default function EventsScreen() {
                 ) : (
                   <p className="info-note">⚠️ {t('organizerNoLocality')}</p>
                 )
+              ) : userProfile?.localityLabel ? (
+                <>
+                  <input
+                    type="text"
+                    aria-label={t('eventLocation')}
+                    value={newEvent.locality || userProfile.localityLabel}
+                    readOnly
+                    className="input-readonly"
+                  />
+                  <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
+                </>
               ) : (
                 <>
                   <input type="text" value={newEvent.locality}
@@ -952,8 +978,9 @@ export default function EventsScreen() {
             const left = spotsLeft(event);
             const bookingStatus = getBookingStatus(event.id);
             const isBooked = bookingStatus === BOOKING_STATUS.CONFIRMED;
-            const isFull = left !== null && left <= 0;
             const isPending = event.status === 'pending_approval';
+            // Spots-left info is only shown to admins; Friends see a clean card
+            const showSpotsLeft = isAdmin() && left !== null;
 
             return (
               <div
@@ -980,8 +1007,8 @@ export default function EventsScreen() {
                 <div className="event-meta">
                   <span className="event-meta-item">📍 {getLocationDisplay(event)}</span>
                   <span className="event-meta-item">📅 {event.dateTime ? new Date(event.dateTime).toLocaleString() : ''}</span>
-                  {left !== null && (
-                    <span className="event-meta-item">👥 {isFull ? t('fullyBooked') : t('spotsLeft', { count: left })}</span>
+                  {showSpotsLeft && (
+                    <span className="event-meta-item">👥 {t('spotsLeft', { count: left })}</span>
                   )}
                   <span className="event-meta-item">💰 {event.price === 0 ? t('eventFree') : (event.price + ' ' + event.currency)}</span>
                 </div>

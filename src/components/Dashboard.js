@@ -23,6 +23,7 @@ function Dashboard({ setCurrentView }) {
   const { t } = useTranslation();
   const {
     userProfile,
+    currentUser,
     logout,
     updateUserProfile,
   } = useAuth();
@@ -40,6 +41,12 @@ function Dashboard({ setCurrentView }) {
   const [interestsMessage, setInterestsMessage] = useState('');
   const isDev = process.env.NODE_ENV !== 'production';
 
+  // Incoming connection requests for notification badge
+  const [pendingConnectionCount, setPendingConnectionCount] = useState(0);
+  // Accepted connection requests to notify requester
+  const [acceptedConnections, setAcceptedConnections] = useState([]);
+  const [acceptedProfiles, setAcceptedProfiles] = useState({});
+
   // Sync interests from userProfile
   useEffect(() => {
     if (userProfile) {
@@ -54,6 +61,51 @@ function Dashboard({ setCurrentView }) {
       }
     }
   }, [userProfile]);
+
+  // Listen for incoming (pending) connection requests — for notification badge
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'contactPermissions'),
+      where('targetUserId', '==', currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setPendingConnectionCount(snap.size);
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
+
+  // Listen for accepted connection requests sent BY current user — to notify requester
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'contactPermissions'),
+      where('requesterId', '==', currentUser.uid),
+      where('status', '==', 'approved')
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      const approved = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAcceptedConnections(approved);
+      // Load target user profiles so we can show name + phone
+      const targetIds = [...new Set(approved.map(r => r.targetUserId))];
+      if (targetIds.length === 0) { setAcceptedProfiles({}); return; }
+      try {
+        const profiles = {};
+        for (let i = 0; i < targetIds.length; i += 10) {
+          const batch = targetIds.slice(i, i + 10);
+          const snap2 = await getDocs(
+            query(collection(db, 'users'), where(documentId(), 'in', batch))
+          );
+          snap2.docs.forEach(d => { profiles[d.id] = { id: d.id, ...d.data() }; });
+        }
+        setAcceptedProfiles(profiles);
+      } catch (err) {
+        console.error('Error loading accepted profiles:', err);
+      }
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
 
   // Load upcoming RSVP'd events
   useEffect(() => {
@@ -174,6 +226,51 @@ function Dashboard({ setCurrentView }) {
 
   return (
     <div className="dashboard">
+      {/* Notification: Incoming connection requests */}
+      {pendingConnectionCount > 0 && (
+        <div className="connection-notification-banner">
+          <span>🔔 {t('pendingConnectionRequests')}: <strong>{pendingConnectionCount}</strong></span>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => setCurrentView('profile')}
+          >
+            {t('acceptRequest')} / {t('rejectRequest')}
+          </button>
+        </div>
+      )}
+
+      {/* Notification: Accepted connections (requester side) */}
+      {acceptedConnections.length > 0 && (
+        <div className="accepted-connections-section">
+          <h4>🎉 {t('connectRequestApproved')}</h4>
+          {acceptedConnections.map(conn => {
+            const profile = acceptedProfiles[conn.targetUserId];
+            if (!profile) return null;
+            const name = profile.displayName || profile.name || conn.targetUserId;
+            return (
+              <div key={conn.id} className="accepted-connection-item">
+                <p>{t('phoneRevealedAlert', { name })}</p>
+                {profile.phoneNumber && (
+                  <div className="phone-reveal">
+                    <span className="phone-number">
+                      📞 {t('phoneNumber')}: <strong>{profile.phoneNumber}</strong>
+                    </span>
+                    <a
+                      href={`https://wa.me/${profile.phoneNumber.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary btn-sm whatsapp-btn"
+                    >
+                      💬 {t('callOrWhatsApp')}
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Profile Header */}
       <div className="dashboard-header">
         <div className="user-info">

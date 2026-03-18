@@ -40,9 +40,14 @@ function UserProfile({ onBack }) {
   const [ratingLoading, setRatingLoading] = useState(null);
   const [ratingMessages, setRatingMessages] = useState({});
 
-  // Contact permissions
+  // Contact permissions (outgoing requests sent by current user)
   const [contactRequests, setContactRequests] = useState({});
   const [contactLoading, setContactLoading] = useState(null);
+
+  // Incoming connection requests (where current user is the target)
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [incomingRequestors, setIncomingRequestors] = useState({});
+  const [incomingActionLoading, setIncomingActionLoading] = useState(null);
 
   // Account status / appeals
   const [appealText, setAppealText] = useState('');
@@ -175,6 +180,37 @@ function UserProfile({ onBack }) {
         map[data.targetUserId] = { id: d.id, ...data };
       });
       setContactRequests(map);
+    }, () => {});
+    return unsub;
+  }, [currentUser]);
+
+  // Load incoming connection requests where current user is the target
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'contactPermissions'),
+      where('targetUserId', '==', currentUser.uid),
+      where('status', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      const requests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setIncomingRequests(requests);
+      // Load requester profiles
+      const requesterIds = [...new Set(requests.map(r => r.requesterId))];
+      if (requesterIds.length === 0) { setIncomingRequestors({}); return; }
+      try {
+        const profiles = {};
+        for (let i = 0; i < requesterIds.length; i += 10) {
+          const batch = requesterIds.slice(i, i + 10);
+          const snap2 = await getDocs(
+            query(collection(db, 'users'), where(documentId(), 'in', batch))
+          );
+          snap2.docs.forEach(d => { profiles[d.id] = { id: d.id, ...d.data() }; });
+        }
+        setIncomingRequestors(profiles);
+      } catch (err) {
+        console.error('Error loading requestor profiles:', err);
+      }
     }, () => {});
     return unsub;
   }, [currentUser]);
@@ -323,6 +359,20 @@ function UserProfile({ onBack }) {
     }
   };
 
+  const handleIncomingRequest = async (requestId, newStatus) => {
+    setIncomingActionLoading(requestId);
+    try {
+      await updateDoc(doc(db, 'contactPermissions', requestId), {
+        status: newStatus,
+        reviewedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Error updating connection request:', err);
+    } finally {
+      setIncomingActionLoading(null);
+    }
+  };
+
   const handleSubmitAppeal = async (e) => {
     e.preventDefault();
     if (!appealText.trim() || !currentUser) return;
@@ -345,12 +395,13 @@ function UserProfile({ onBack }) {
     }
   };
 
-  const starDescriptions = [
-    t('star1Desc'),
-    t('star2Desc'),
-    t('star3Desc'),
-    t('star4Desc'),
-    t('star5Desc'),
+  // Face-based rating options: index 0 = value 1 (very happy) ... index 4 = value 5 (very unhappy)
+  const faceRatings = [
+    { value: 1, emoji: '😍', desc: t('face1Desc') },
+    { value: 2, emoji: '😊', desc: t('face2Desc') },
+    { value: 3, emoji: '😐', desc: t('face3Desc') },
+    { value: 4, emoji: '😞', desc: t('face4Desc') },
+    { value: 5, emoji: '😢', desc: t('face5Desc') },
   ];
 
   return (
@@ -552,6 +603,54 @@ function UserProfile({ onBack }) {
           </div>
         </form>
 
+        {/* Incoming Connection Requests — visible to the destination user */}
+        {incomingRequests.length > 0 && (
+          <div className="incoming-requests-section">
+            <h3>🔔 {t('pendingConnectionRequests')}</h3>
+            <div className="incoming-requests-list">
+              {incomingRequests.map(req => {
+                const requester = incomingRequestors[req.requesterId];
+                const name = requester?.displayName || requester?.name || req.requesterId;
+                return (
+                  <div key={req.id} className="incoming-request-item">
+                    <div className="person-info">
+                      <div className="person-avatar">
+                        {requester?.photoURL
+                          ? <img src={requester.photoURL} alt="" />
+                          : (name || '?')[0].toUpperCase()
+                        }
+                      </div>
+                      <div className="person-details">
+                        <strong>{name}</strong>
+                        {requester?.localityLabel && <small>📍 {requester.localityLabel}</small>}
+                        <p className="request-msg">{t('connectionRequestFrom', { name })}</p>
+                      </div>
+                    </div>
+                    <div className="request-actions">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleIncomingRequest(req.id, 'approved')}
+                        disabled={incomingActionLoading === req.id}
+                      >
+                        ✅ {t('acceptRequest')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleIncomingRequest(req.id, 'rejected')}
+                        disabled={incomingActionLoading === req.id}
+                      >
+                        ✕ {t('rejectRequest')}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Met People & Ratings */}
         <div className="met-people-section">
           <h3>🤝 {t('metPeople')}</h3>
@@ -562,6 +661,7 @@ function UserProfile({ onBack }) {
               {metPeople.map(person => {
                 const existingRating = ratingsGiven[person.id];
                 const contactReq = contactRequests[person.id];
+                const isApproved = contactReq?.status === 'approved';
 
                 return (
                   <div key={person.id} className="met-person-card">
@@ -580,20 +680,20 @@ function UserProfile({ onBack }) {
                       </div>
                     </div>
 
-                    {/* Star Rating */}
-                    <div className="star-rating-row">
+                    {/* Face-based Rating */}
+                    <div className="face-rating-row">
                       <span className="rating-label">{t('ratePerson')}:</span>
-                      <div className="stars">
-                        {[1, 2, 3, 4, 5].map(star => (
+                      <div className="face-rating-buttons">
+                        {faceRatings.map(({ value, emoji, desc }) => (
                           <button
-                            key={star}
+                            key={value}
                             type="button"
-                            className={`star-btn ${(existingRating?.numericRating || 0) >= star ? 'star-filled' : ''}`}
-                            onClick={() => handleSubmitRating(person.id, star)}
+                            className={`face-btn ${existingRating?.numericRating === value ? 'face-selected' : ''}`}
+                            onClick={() => handleSubmitRating(person.id, value)}
                             disabled={ratingLoading === person.id}
-                            title={starDescriptions[star - 1]}
+                            title={desc}
                           >
-                            ★
+                            {emoji}
                           </button>
                         ))}
                       </div>
@@ -605,17 +705,35 @@ function UserProfile({ onBack }) {
                     {/* Connect Request */}
                     <div className="connect-row">
                       {contactReq ? (
-                        <span className={`connect-status connect-${contactReq.status}`}>
-                          {contactReq.status === 'approved'
-                            ? t('connectRequestApproved')
-                            : contactReq.status === 'rejected'
-                              ? '✗ Declined'
-                              : t('connectRequestPending')}
-                        </span>
+                        <div className="connect-status-block">
+                          <span className={`connect-status connect-${contactReq.status}`}>
+                            {isApproved
+                              ? '✅ ' + t('connectRequestApproved')
+                              : contactReq.status === 'rejected'
+                                ? '✗ ' + t('connectRequestRejected')
+                                : '⏳ ' + t('connectRequestPending')}
+                          </span>
+                          {/* Show phone number when connection is approved */}
+                          {isApproved && person.phoneNumber && (
+                            <div className="phone-reveal">
+                              <span className="phone-number">
+                                📞 {t('phoneNumber')}: <strong>{person.phoneNumber}</strong>
+                              </span>
+                              <a
+                                href={`https://wa.me/${person.phoneNumber.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary btn-sm whatsapp-btn"
+                              >
+                                💬 {t('callOrWhatsApp')}
+                              </a>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <button
                           type="button"
-                          className="btn-secondary btn-sm"
+                          className="btn btn-secondary btn-sm"
                           onClick={() => handleConnectRequest(person.id)}
                           disabled={contactLoading === person.id}
                         >

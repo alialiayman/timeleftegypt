@@ -83,10 +83,13 @@ export default function EventsScreen() {
     if (isAdmin() && organizerLocality) {
       setNewEvent(prev => ({ ...prev, locality: organizerLocality }));
     } else if (!isAdmin()) {
-      const friendLocality = userProfile?.localityLabel || userProfile?.localityId || '';
+      const friendLocality = userProfile?.localityLabel || '';
       const friendLocalityId = userProfile?.localityId || '';
-      if (friendLocality) {
+      // Only pre-fill if we have a real locality label (not just an id)
+      if (friendLocality && friendLocalityId) {
         setNewEvent(prev => ({ ...prev, locality: friendLocality, localityId: friendLocalityId }));
+      } else if (friendLocality) {
+        setNewEvent(prev => ({ ...prev, locality: friendLocality }));
       }
     }
   }, [showCreateForm]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -909,7 +912,13 @@ export default function EventsScreen() {
                 )
               ) : userProfile?.localityLabel ? (
                 <>
-                  <input type="text" value={newEvent.locality || userProfile.localityLabel} readOnly className="input-readonly" />
+                  <input
+                    type="text"
+                    aria-label={t('eventLocation')}
+                    value={newEvent.locality || userProfile.localityLabel}
+                    readOnly
+                    className="input-readonly"
+                  />
                   <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
                 </>
               ) : (

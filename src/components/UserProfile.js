@@ -617,7 +617,7 @@ function UserProfile({ onBack }) {
                       <div className="person-avatar">
                         {requester?.photoURL
                           ? <img src={requester.photoURL} alt="" />
-                          : name[0].toUpperCase()
+                          : (name || '?')[0].toUpperCase()
                         }
                       </div>
                       <div className="person-details">

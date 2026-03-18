@@ -27,6 +27,8 @@ Gatherly brings people together through events tied to geographic localities (e.
 
 Events are locality-scoped: an Organizer's events automatically belong to their assigned locality, and a Friend sees only events from the locality they've chosen in their profile.
 
+<img width="755" height="99" alt="image" src="https://github.com/user-attachments/assets/ed154f64-5cd7-438f-b584-8ba244b695f4" />
+
 ---
 
 ## Roles
@@ -42,6 +44,8 @@ The Master has full control over the system. Their responsibilities include:
 
 The Master panel is the source of truth for which Organizer manages which locality.
 
+<img width="1191" height="594" alt="image" src="https://github.com/user-attachments/assets/853490f2-d339-4a3d-91f5-90fb11e69d1c" />
+
 ---
 
 ### 🎟️ Organizer (Event Admin)
@@ -55,6 +59,10 @@ An Organizer is a user assigned by the Master to manage a specific locality. The
 
 > **Important:** An Organizer's event locality is **always inherited** from the Master's assignment. The Organizer cannot edit it — it appears as a read-only field in the event creation form.
 
+<img width="1194" height="744" alt="image" src="https://github.com/user-attachments/assets/323e8f5f-56ce-4bbc-b071-d6b3f0324621" />
+
+<img width="1089" height="436" alt="image" src="https://github.com/user-attachments/assets/fdb979ed-9743-41d3-a538-5bc8adf0f6a8" />
+
 ---
 
 ### 👥 Friend (Regular User)
@@ -67,6 +75,8 @@ A Friend is a regular member of the community. Their experience includes:
 - **Submitting events** — Friends can submit event suggestions (pending Organizer approval).
 - **Rating events** — After events, Friends can rate their experience.
 
+<img width="1201" height="767" alt="image" src="https://github.com/user-attachments/assets/c75ed3c3-39b4-4d3e-ae7a-88d2c013cd5c" />
+
 ---
 
 ## How Locality Works
@@ -76,6 +86,7 @@ Locality is a hierarchical geographic identifier in the format:
 ```
 Egypt → Cairo → New Cairo
 ```
+<img width="1108" height="754" alt="image" src="https://github.com/user-attachments/assets/eb59ab2a-3298-48b5-80ae-0add406e9e8a" />
 
 ### Organizer Locality
 
@@ -87,6 +98,9 @@ Egypt → Cairo → New Cairo
 4. When an Organizer creates an event, the event's `locality` field is set to `organizerLocalityLabel`.
 5. The locality field is **read-only** in the event creation form — Organizers cannot change it.
 
+<img width="1063" height="783" alt="image" src="https://github.com/user-attachments/assets/33516327-9415-4201-8d86-565e3650dbbb" />
+
+
 ### Friend Locality
 
 1. A Friend selects their area in their profile (from the list of active localities).
@@ -95,6 +109,9 @@ Egypt → Cairo → New Cairo
    - `localityLabel` — the human-readable label (e.g., "Egypt → Cairo → New Cairo")
 3. The Dashboard and Events tab filter events using `event.locality === userProfile.localityLabel`.
 4. Only published events from the Friend's chosen locality are shown.
+
+<img width="1197" height="721" alt="image" src="https://github.com/user-attachments/assets/0e04ce1f-13a2-4e99-982f-484a5a9195d8" />
+
 
 ### Why these are separate
 
@@ -117,6 +134,7 @@ Master → Super Admin Panel → Localities
   → System writes organizerLocalityId + organizerLocalityLabel to the user's Firestore doc
   → Organizer receives email notification
 ```
+<img width="1065" height="626" alt="image" src="https://github.com/user-attachments/assets/66f90865-5567-4d4e-940e-198fbd6a4351" />
 
 ### 2. Organizer Creates an Event
 
@@ -128,6 +146,7 @@ Organizer → Events tab → Create Event
   → Event is saved to Firestore with status = "published" and locality = organizerLocalityLabel
   → Email sent to all Friends in that locality
 ```
+<img width="972" height="731" alt="image" src="https://github.com/user-attachments/assets/4d4dc3df-1bc9-42e5-9223-11aa8a40c92b" />
 
 ### 3. Friend Browses Events
 
@@ -143,54 +162,13 @@ Friend → Events tab
   → Shows all published events filtered by their profile locality
   → Can book events directly from here
 ```
+<img width="1239" height="597" alt="image" src="https://github.com/user-attachments/assets/db0678bd-e98c-414a-9c2a-04bb2a3939ce" />
 
 ### 4. Locality-Based Visibility
 
 - Only events where `event.locality === userProfile.localityLabel` are shown to a Friend.
 - Events from other localities are not shown in Friend-facing views.
 - Organizers and Masters see all events regardless of locality.
-
----
-
-## Screenshots
-
-### Master Panel — Locality Management
-
-![Master Panel](docs/screenshots/master-panel.png)
-
-*The Master creates localities and assigns Organizers. Each locality entry shows the country, city, and area.*
-
----
-
-### Organizer Event Creation — Read-Only Locality
-
-![Organizer Event Creation](docs/screenshots/organizer-create-event.png)
-
-*When an Organizer creates an event, the Locality field is read-only. It is inherited from their Master-assigned locality and cannot be changed.*
-
----
-
-### Friend Dashboard — Events in Your Area
-
-![Friend Dashboard](docs/screenshots/friend-dashboard.png)
-
-*The Friend's dashboard shows two sections: "Events in Your Area" (locality-filtered discovery) and "Upcoming RSVP'd Events" (booked events).*
-
----
-
-### Friend Events Tab — Locality-Filtered List
-
-![Friend Events Tab](docs/screenshots/friend-events-tab.png)
-
-*The Events tab shows all published events in the Friend's chosen locality. Friends can book directly from this view.*
-
----
-
-### Friend Profile — Locality Selection
-
-![Friend Profile Locality](docs/screenshots/friend-profile-locality.png)
-
-*Friends select their area in the profile page. This controls which events they see on the Dashboard and Events tab.*
 
 ---
 
@@ -310,34 +288,103 @@ const firebaseConfig = {
 ### Start Development Server
 
 ```bash
-npm start
-```
+npx expo start
+````
 
-Open [http://localhost:3000](http://localhost:3000).
+This will open the Expo Dev Tools.
+
+You can then:
+
+* Press `w` to open the web version
+* Press `i` to run on iOS simulator
+* Press `a` to run on Android emulator
+* Or scan the QR code using Expo Go on your phone
+
+---
 
 ### Initial Setup
 
-1. Sign in with Google.
-2. In Firestore, manually set your user document's `role` field to `super_admin` to become the Master.
-3. Create localities in the Super Admin Panel.
+1. Sign in with Google (or continue as guest if enabled).
+2. In Firestore, manually set your user document's `role` field to `master` to become the Master.
+3. Create localities in the Master panel.
 4. Assign users as Organizers for each locality.
 
 ---
 
 ## Deployment
 
-### Firebase Hosting
+### Web (Firebase Hosting)
+
+Build the web version:
 
 ```bash
-npm run build
+npx expo export --platform web
+```
+
+This will generate a `dist` folder.
+
+Deploy to Firebase:
+
+```bash
 firebase deploy
 ```
 
-### Other Platforms
+Make sure your `firebase.json` is configured with:
 
-The app builds to a static bundle and can be deployed to Netlify, Vercel, AWS Amplify, or any static hosting service.
+```json
+{
+  "hosting": {
+    "public": "dist"
+  }
+}
+```
 
 ---
+
+### Mobile (iOS / Android)
+
+#### iOS (TestFlight / App Store)
+
+```bash
+npx expo prebuild
+```
+
+Then open Xcode:
+
+```bash
+open ios/*.xcworkspace
+```
+
+Archive and upload via Xcode Organizer.
+
+---
+
+#### Android
+
+```bash
+npx expo prebuild
+```
+
+Then open Android Studio:
+
+```bash
+open android
+```
+
+Build APK/AAB from Android Studio.
+
+---
+
+### Other Platforms
+
+The web build outputs static files in the `dist` folder and can be deployed to:
+
+* Netlify
+* Vercel
+* AWS Amplify
+* Any static hosting provider
+
+```
 
 ## Firestore Security Rules (Recommended)
 
@@ -374,362 +421,3 @@ service cloud.firestore {
 
 Built with ❤️ for better community connections.
 
-
-A modern web application for automatically assigning TimeLeft members to tables for reconnection events. Built with React and Firebase, this system helps organize small to medium-sized gatherings (2-25 people) by intelligently distributing participants across tables.
-
-## ✨ Features
-
-### 🔐 Authentication
-- **Google Sign-In**: Full integration with Google authentication
-- **Name-Based Entry**: Quick access by simply entering your name
-- **Anonymous Support**: Users can participate without creating accounts
-
-### 🎲 Smart Table Assignment
-- **Automatic Assignment**: Intelligent algorithm distributes users evenly across tables
-- **Configurable Table Size**: Admin can set maximum people per table (default: 5)
-- **Location-Aware**: Optional location-based grouping for better reconnection
-- **Round-Robin Distribution**: Ensures balanced table assignments
-
-### 👤 User Profiles
-- **Rich Profiles**: Full name, photo, gender, dietary preferences
-- **Interest Matching**: Share hobbies, professional background
-- **Photo Upload**: Firebase Storage integration for profile pictures
-- **Location Tracking**: Automatic geolocation with user permission
-
-### 🔧 Admin Panel
-- **Settings Management**: Configure table size, location preferences
-- **User Management**: View all users and their assignments
-- **Table Shuffling**: Reorganize tables with different algorithms
-- **Real-time Statistics**: Monitor participation and distribution
-- **Bulk Operations**: Reassign all users or clear all tables
-
-### 📱 Real-time Features
-- **Live Updates**: See table assignments update in real-time
-- **Table Switching**: Users can request to change tables
-- **Member Visibility**: View all table companions with their details
-- **Occupancy Tracking**: Real-time table capacity monitoring
-
-## 🛠️ Technology Stack
-
-- **Frontend**: React 19.2.0 with modern hooks
-- **Styling**: Custom CSS with responsive design
-- **Backend**: Firebase Suite
-  - Authentication (Google + Anonymous)
-  - Firestore (Real-time database)
-  - Storage (Profile photos)
-  - Hosting ready
-- **Algorithm**: Modular table assignment system
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v14 or higher)
-- npm or yarn
-- Firebase project with Authentication, Firestore, and Storage enabled
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd timeleftegypt
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Firebase Configuration**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
-   - Enable Authentication (Google provider)
-   - Enable Firestore Database
-   - Enable Storage
-   - Update `src/firebase.js` with your Firebase config
-
-4. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-5. **Open your browser**
-   Navigate to `http://localhost:3000`
-
-### Firebase Setup
-
-1. **Authentication**
-   - Enable Google Sign-in provider
-   - Enable Anonymous authentication
-
-2. **Firestore Rules** (Basic setup - adjust for production)
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       // Users can read/write their own profile
-       match /users/{userId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-       }
-       
-       // Anyone can read user profiles and tables
-       match /users/{document=**} {
-         allow read: if request.auth != null;
-       }
-       
-       match /tables/{document=**} {
-         allow read, write: if request.auth != null;
-       }
-       
-       // Only admins can modify settings
-       match /settings/{document=**} {
-         allow read: if request.auth != null;
-         allow write: if request.auth != null && 
-           request.auth.token.email in resource.data.adminEmails;
-       }
-     }
-   }
-   ```
-
-3. **Storage Rules**
-   ```javascript
-   rules_version = '2';
-   service firebase.storage {
-     match /b/{bucket}/o {
-       match /profile-photos/{userId}/{allPaths=**} {
-         allow read: if request.auth != null;
-         allow write: if request.auth != null && request.auth.uid == userId;
-       }
-     }
-   }
-   ```
-
-## 🎯 Usage Guide
-
-### For Regular Users
-
-1. **Sign In**: Use Google or enter your name
-2. **Complete Profile**: Add photo, preferences, and details
-3. **Get Table Assignment**: Click to be assigned to a table
-4. **Meet Your Table**: View your table companions
-5. **Change Tables**: Request to switch if needed
-
-### For Administrators
-
-1. **Access Admin Panel**: Available in header navigation for admin users
-2. **Configure Settings**: 
-   - Set maximum people per table
-   - Enable/disable location-based assignment
-   - Manage admin email list
-3. **Manage Users**: View all participants and their details
-4. **Organize Tables**:
-   - Reassign all users with fresh algorithm
-   - Shuffle existing table assignments
-   - Clear all assignments to start fresh
-
-## 🏗️ Architecture
-
-### Component Structure
-```
-src/
-├── components/
-│   ├── AdminPanel.js      # Admin dashboard and controls
-│   ├── Dashboard.js       # Main user interface
-│   ├── LoginForm.js       # Authentication interface
-│   └── UserProfile.js     # Profile management
-├── contexts/
-│   └── AuthContext.js     # Authentication and data management
-├── algorithms/
-│   └── tableAssignment.js # Table assignment logic
-├── firebase.js            # Firebase configuration
-├── App.js                 # Main application component
-└── App.css               # Styling
-```
-
-### Data Models
-
-**User Profile**
-```javascript
-{
-  id: "user-id",
-  email: "user@example.com",
-  displayName: "John Doe",
-  fullName: "John Michael Doe",
-  photoURL: "https://...",
-  gender: "male",
-  preferences: {
-    dietary: "vegetarian",
-    interests: "Technology, Travel",
-    experience: "Software Engineer"
-  },
-  location: {
-    latitude: 40.7128,
-    longitude: -74.0060,
-    accuracy: 10
-  },
-  isAnonymous: false,
-  createdAt: "2025-10-30T...",
-  lastUpdated: "2025-10-30T..."
-}
-```
-
-**Table Assignment**
-```javascript
-{
-  id: "table-1",
-  name: "Table 1",
-  members: [
-    {
-      id: "user-id",
-      name: "John Doe",
-      fullName: "John Michael Doe",
-      photoURL: "https://...",
-      gender: "male",
-      preferences: {...}
-    }
-  ]
-}
-```
-
-**Settings**
-```javascript
-{
-  maxPeoplePerTable: 5,
-  considerLocation: false,
-  adminEmails: ["admin@example.com"]
-}
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-Create a `.env` file for production deployment:
-```
-REACT_APP_FIREBASE_API_KEY=your_api_key
-REACT_APP_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=your_project_id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=123456789
-REACT_APP_FIREBASE_APP_ID=1:123456789:web:abcdef
-```
-
-### Admin Configuration
-To set up admin users:
-1. Go to Firestore Console
-2. Create a document in `settings/main`
-3. Add field `adminEmails` as an array of email addresses
-
-## 📱 Responsive Design
-
-The application is fully responsive and works on:
-- **Desktop**: Full feature set with optimal layout
-- **Tablet**: Adapted grid layouts and touch-friendly controls
-- **Mobile**: Stacked layouts with simplified navigation
-
-## 🎨 Customization
-
-### Styling
-- Modern CSS with custom properties
-- Gradient themes and smooth animations
-- Easy color scheme modification in `App.css`
-
-### Algorithm
-The table assignment algorithm is modular (`src/algorithms/tableAssignment.js`):
-- **Round-robin**: Even distribution
-- **Location-based**: Geographic clustering
-- **Shuffle**: Random redistribution
-- **Custom**: Easy to extend for new strategies
-
-## 🚀 Deployment
-
-### Firebase Hosting
-```bash
-npm run build
-firebase deploy
-```
-
-### Other Platforms
-The app can be deployed to:
-- Netlify
-- Vercel
-- AWS Amplify
-- Any static hosting service
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the GitHub repository
-- Check the Firebase documentation for backend issues
-- Review the React documentation for frontend questions
-
-## 🔮 Future Enhancements
-
-- **QR Code Check-in**: Quick mobile access
-- **Table Chat**: In-app messaging between table members
-- **Event Templates**: Predefined configurations for different event types
-- **Analytics Dashboard**: Detailed insights on reconnection patterns
-- **Integration APIs**: Connect with event management platforms
-- **Multi-language Support**: Internationalization
-- **Advanced Matching**: AI-powered compatibility matching
-- **Table Recommendations**: Suggest optimal table switches
-
-## 📊 Performance
-
-- **Real-time Updates**: Firestore provides instant synchronization
-- **Optimized Rendering**: React hooks and efficient state management
-- **Responsive Images**: Automatic photo optimization
-- **Minimal Bundle Size**: Optimized production builds
-
----
-
-## Available Scripts (Create React App)
-
-In the project directory, you can run:
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
----
-
-Built with ❤️ for better reconnection experiences.

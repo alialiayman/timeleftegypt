@@ -166,6 +166,11 @@ export const createEvent = (overrides = {}) => ({
   title: '',
   description: '',
   type: 'dinner',
+  // locality/localityId: area used for Friend event discovery (label + Firestore ID)
+  locality: '',
+  localityId: '',
+  // locationId: optional Firestore reference to a physical venue location document
+  // locationName: mirrors locality label for public display (backward-compat and post-reveal display)
   locationId: '',
   locationName: '',
   dateTime: '',
@@ -178,7 +183,10 @@ export const createEvent = (overrides = {}) => ({
   createdAt: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   attendeeIds: [],
-  schedulingGroups: [],
+  // Venue scheduling fields
+  venueGroups: [],
+  locationRevealed: false,
+  schedulingCompleted: false,
   ...overrides,
 });
 

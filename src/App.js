@@ -8,7 +8,6 @@ import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
 import SuperAdminPanel from './components/SuperAdminPanel';
-import LocationSelection from './components/LocationSelection';
 import EventsScreen from './components/EventsScreen';
 
 function AppContent() {
@@ -51,12 +50,6 @@ function AppContent() {
         <p>{t('loadingProfile')}</p>
       </div>
     );
-  }
-
-  const needsLocationSelection = !isAdmin() && !userProfile?.currentLocationId;
-
-  if (needsLocationSelection) {
-    return <LocationSelection />;
   }
 
   const renderCurrentView = () => {

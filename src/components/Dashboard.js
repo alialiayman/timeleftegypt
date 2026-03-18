@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
@@ -6,6 +6,7 @@ import {
   collection, query, where, onSnapshot, getDocs, documentId
 } from 'firebase/firestore';
 import { BOOKING_STATUS } from '../models';
+import InterestsEditor from './InterestsEditor';
 
 const EVENT_TYPE_ICONS = {
   dinner: '🍽️',
@@ -31,10 +32,8 @@ function Dashboard({ setCurrentView }) {
 
   // Interests editing state
   const [interests, setInterests] = useState([]);
-  const [interestInput, setInterestInput] = useState('');
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsMessage, setInterestsMessage] = useState('');
-  const interestInputRef = useRef(null);
 
   // Sync interests from userProfile
   useEffect(() => {
@@ -110,27 +109,6 @@ function Dashboard({ setCurrentView }) {
     return '📍 —';
   };
 
-  // Interests management
-  const handleAddInterest = () => {
-    const val = interestInput.trim();
-    if (!val) return;
-    if (interests.includes(val)) return;
-    setInterests([...interests, val]);
-    setInterestInput('');
-    interestInputRef.current?.focus();
-  };
-
-  const handleRemoveInterest = (interest) => {
-    setInterests(interests.filter(i => i !== interest));
-  };
-
-  const handleInterestKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddInterest();
-    }
-  };
-
   const handleSaveInterests = async () => {
     try {
       setInterestsSaving(true);
@@ -191,43 +169,12 @@ function Dashboard({ setCurrentView }) {
       <div className="interests-section">
         <h3>{t('yourInterests')}</h3>
 
-        <div className="interests-display">
-          {interests.length === 0 ? (
-            <p className="no-interests-msg">{t('noInterests')}</p>
-          ) : (
-            interests.map((interest, index) => (
-              <span key={index} className="interest-badge">
-                {interest}
-                <button
-                  className="interest-remove-btn"
-                  onClick={() => handleRemoveInterest(interest)}
-                  title={t('removeInterest')}
-                >
-                  ×
-                </button>
-              </span>
-            ))
-          )}
-        </div>
+        <InterestsEditor
+          interests={interests}
+          onChange={setInterests}
+        />
 
         <div className="interests-add-row">
-          <input
-            ref={interestInputRef}
-            type="text"
-            className="interest-input"
-            value={interestInput}
-            onChange={e => setInterestInput(e.target.value)}
-            onKeyDown={handleInterestKeyDown}
-            placeholder={t('interestPlaceholder')}
-            maxLength={50}
-          />
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={handleAddInterest}
-            disabled={!interestInput.trim()}
-          >
-            {t('addInterest')}
-          </button>
           <button
             className="btn btn-primary btn-sm"
             onClick={handleSaveInterests}

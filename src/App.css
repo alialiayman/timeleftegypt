@@ -489,7 +489,7 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--g-primary) 0%, var(--g-primary-dark) 100%);
   border-radius: 24px;
   color: white;
   font-size: 1rem;
@@ -1343,8 +1343,8 @@ body {
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1rem;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
   border-radius: 8px;
   min-height: 100px;
 }
@@ -1353,25 +1353,26 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 0.5rem 1rem;
-  background: #f8f9fa;
-  border: 2px solid #dee2e6;
+  background: var(--g-surface-2);
+  border: 2px solid var(--g-border);
   border-radius: 20px;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #495057;
+  color: var(--g-text);
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
 }
 
 .interest-tag:hover {
-  border-color: #667eea;
+  border-color: var(--g-primary);
+  color: var(--g-primary);
   transform: translateY(-1px);
 }
 
 .interest-tag.selected {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
+  background: linear-gradient(135deg, var(--g-primary) 0%, var(--g-primary-dark) 100%);
+  border-color: var(--g-primary);
   color: white;
 }
 
@@ -1379,8 +1380,8 @@ body {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--g-primary);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
 }
 
 .checkbox-label {
@@ -4280,16 +4281,17 @@ body {
 
 /* ---- Dashboard Interests ---- */
 .interests-section {
-  background: white;
-  border-radius: 12px;
+  background: var(--g-surface-2);
+  border-radius: var(--g-radius);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: var(--g-shadow-sm);
+  border: 1px solid var(--g-border-light);
 }
 
 .interests-section h3 {
   margin-bottom: 1rem;
-  color: #1c1917;
+  color: var(--g-text);
   font-size: 1.1rem;
 }
 
@@ -4301,7 +4303,7 @@ body {
 }
 
 .interest-badge {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--g-primary) 0%, var(--g-primary-dark) 100%);
   color: white;
   padding: 6px 14px;
   border-radius: 20px;
@@ -4335,20 +4337,21 @@ body {
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
+  margin-top: 1rem;
 }
 
 .interest-input {
   flex: 1;
   min-width: 180px;
   padding: 8px 12px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--g-border);
   border-radius: 6px;
   font-size: 0.9rem;
 }
 .interest-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+  border-color: var(--g-primary);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
 }
 
 .interests-saved-msg,
@@ -4400,14 +4403,19 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0.5rem 0;
+  padding: 0.75rem;
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-sm);
+  min-height: 80px;
 }
 
 .interest-tag {
   padding: 6px 14px;
   border-radius: 20px;
-  border: 2px solid #dee2e6;
-  background: #f8f9fa;
-  color: #495057;
+  border: 2px solid var(--g-border);
+  background: var(--g-surface-2);
+  color: var(--g-text);
   cursor: pointer;
   font-size: 0.85rem;
   transition: all 0.2s ease;
@@ -4415,13 +4423,13 @@ body {
 }
 
 .interest-tag:hover {
-  border-color: #667eea;
-  color: #667eea;
+  border-color: var(--g-primary);
+  color: var(--g-primary);
 }
 
 .interest-tag.selected {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-color: #667eea;
+  background: linear-gradient(135deg, var(--g-primary) 0%, var(--g-primary-dark) 100%);
+  border-color: var(--g-primary);
   color: white;
 }
 

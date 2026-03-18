@@ -290,10 +290,14 @@ export default function EventsScreen() {
     e.preventDefault();
     setEditLoading(true);
     try {
+      // For organizers, locality is always inherited from their Master-assigned locality
+      const persistedLocality = isAdmin() && organizerLocality
+        ? organizerLocality
+        : editForm.locality;
       await updateDoc(doc(db, 'events', selectedEvent.id), {
         title: editForm.title, description: editForm.description,
-        type: editForm.type, locality: editForm.locality,
-        venueLocation: editForm.locationName, locationName: editForm.locality,
+        type: editForm.type, locality: persistedLocality,
+        venueLocation: editForm.locationName, locationName: persistedLocality,
         dateTime: editForm.dateTime ? new Date(editForm.dateTime).toISOString() : selectedEvent.dateTime,
         maxAttendees: editForm.maxAttendees ? Number(editForm.maxAttendees) : null,
         price: Number(editForm.price), currency: editForm.currency,
@@ -456,9 +460,15 @@ export default function EventsScreen() {
     return event.venueGroups.find(g => g.attendeeIds?.includes(currentUser.uid)) || null;
   };
 
+  // For Friends (non-admin), filter published events to their own locality
+  const userLocality = !isAdmin() ? (userProfile?.localityLabel || '') : '';
+
   const allVisibleEvents = isAdmin()
     ? events
-    : [...events, ...myPendingEvents.filter(pe => !events.some(e => e.id === pe.id))];
+    : [
+        ...events.filter(ev => !userLocality || ev.locality === userLocality),
+        ...myPendingEvents.filter(pe => !events.some(e => e.id === pe.id)),
+      ];
 
   if (loading) {
     return (
@@ -553,9 +563,16 @@ export default function EventsScreen() {
             </div>
             <div className="form-group">
               <label>{t('eventLocation')}</label>
-              <input type="text" value={editForm.locality}
-                onChange={e => setEditForm(p => ({ ...p, locality: e.target.value }))}
-                placeholder="e.g. Egypt Cairo New Cairo" />
+              {isAdmin() && organizerLocality ? (
+                <>
+                  <input type="text" value={organizerLocality} readOnly className="input-readonly" />
+                  <small className="locality-readonly-note">📍 {t('eventLocalityReadOnly')}</small>
+                </>
+              ) : (
+                <input type="text" value={editForm.locality}
+                  onChange={e => setEditForm(p => ({ ...p, locality: e.target.value }))}
+                  placeholder="e.g. Egypt Cairo New Cairo" />
+              )}
             </div>
             <div className="form-group">
               <label>{t('eventVenue')}</label>

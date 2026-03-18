@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
-  collection, query, where, onSnapshot, getDocs, documentId
+  collection, query, where, onSnapshot, getDocs, documentId, orderBy
 } from 'firebase/firestore';
 import { BOOKING_STATUS } from '../models';
 import InterestsEditor from './InterestsEditor';
@@ -29,6 +29,10 @@ function Dashboard({ setCurrentView }) {
 
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+
+  // Locality-based event discovery
+  const [localityEvents, setLocalityEvents] = useState([]);
+  const [localityEventsLoading, setLocalityEventsLoading] = useState(true);
 
   // Interests editing state
   const [interests, setInterests] = useState([]);
@@ -92,6 +96,34 @@ function Dashboard({ setCurrentView }) {
 
     return unsub;
   }, [userProfile?.id]);
+
+  // Load published events in the Friend's chosen locality
+  useEffect(() => {
+    const userLocality = userProfile?.localityLabel || '';
+    if (!userLocality) {
+      setLocalityEvents([]);
+      setLocalityEventsLoading(false);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const q = query(
+      collection(db, 'events'),
+      where('status', '==', 'published'),
+      orderBy('dateTime', 'asc')
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const filtered = all.filter(
+        ev => ev.locality === userLocality && ev.dateTime && ev.dateTime >= now
+      );
+      setLocalityEvents(filtered);
+      setLocalityEventsLoading(false);
+    }, () => setLocalityEventsLoading(false));
+
+    return unsub;
+  }, [userProfile?.localityLabel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     if (window.confirm(t('logout') + '?')) {
@@ -185,6 +217,89 @@ function Dashboard({ setCurrentView }) {
         </div>
         {interestsMessage && (
           <p className="interests-saved-msg">{interestsMessage}</p>
+        )}
+      </div>
+
+      {/* Events in Your Locality */}
+      <div className="events-section">
+        <h3>📍 {t('localityEventsTitle')}</h3>
+
+        {!userProfile?.localityLabel ? (
+          <div className="empty-state">
+            <p>{t('setLocalityPrompt')}</p>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setCurrentView('profile')}
+            >
+              {t('editProfile')}
+            </button>
+          </div>
+        ) : localityEventsLoading ? (
+          <div className="loading-container" style={{ height: 'auto', padding: '2rem' }}>
+            <div className="loading-spinner"></div>
+          </div>
+        ) : localityEvents.length === 0 ? (
+          <div className="empty-state">
+            <p>{t('noLocalityEvents')}</p>
+          </div>
+        ) : (
+          <div className="events-grid">
+            {localityEvents.map(event => (
+              <div key={event.id} className="event-card">
+                <div className="event-header">
+                  <div className="event-title">
+                    <span className="event-emoji">
+                      {EVENT_TYPE_ICONS[event.type] || '🎉'}
+                    </span>
+                    <h4>{event.title}</h4>
+                  </div>
+                </div>
+
+                <div className="event-details">
+                  <div className="event-detail">
+                    <span className="detail-icon">📅</span>
+                    <span className="detail-text">
+                      {event.dateTime
+                        ? new Date(event.dateTime).toLocaleString()
+                        : '—'}
+                    </span>
+                  </div>
+                  <div className="event-detail">
+                    <span className="detail-icon">📍</span>
+                    <span className="detail-text location-tbd">
+                      {event.locality || t('eventVenueHidden')}
+                    </span>
+                  </div>
+                  {event.price === 0 ? (
+                    <div className="event-detail">
+                      <span className="detail-icon">💰</span>
+                      <span className="detail-text">{t('eventFree')}</span>
+                    </div>
+                  ) : (
+                    <div className="event-detail">
+                      <span className="detail-icon">💰</span>
+                      <span className="detail-text">
+                        {event.price} {event.currency}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {event.description && (
+                  <p className="event-description">{event.description}</p>
+                )}
+
+                <div className="event-actions">
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setCurrentView('events')}
+                  >
+                    {t('eventBrowse')}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

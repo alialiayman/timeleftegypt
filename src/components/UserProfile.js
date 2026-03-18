@@ -7,12 +7,7 @@ import {
   collection, query, where, onSnapshot, addDoc, updateDoc, doc,
   getDocs, orderBy, documentId
 } from 'firebase/firestore';
-
-const ALL_INTERESTS = [
-  '🎬 Movie Night', '🎾 Padel', '✨ Soirée', '🍽️ Dinner',
-  '☕ Coffee Meetup', '📚 Library Meetup', '🏓 Paddle',
-  '🎮 Gaming', '🎨 Art', '🏃 Sports', '🎵 Music', '🍳 Cooking', '✈️ Travel',
-];
+import InterestsEditor from './InterestsEditor';
 
 function UserProfile({ onBack }) {
   const { t } = useTranslation();
@@ -213,16 +208,6 @@ function UserProfile({ onBack }) {
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-  };
-
-  const toggleInterest = (interest) => {
-    setFormData(prev => {
-      const current = prev.preferences.interests;
-      const updated = current.includes(interest)
-        ? current.filter(i => i !== interest)
-        : [...current, interest];
-      return { ...prev, preferences: { ...prev.preferences, interests: updated } };
-    });
   };
 
   const handlePhotoUpload = async (e) => {
@@ -531,17 +516,13 @@ function UserProfile({ onBack }) {
 
             <div className="form-group">
               <label>{t('interests')}</label>
-              <div className="interests-tags">
-                {ALL_INTERESTS.map(interest => (
-                  <span
-                    key={interest}
-                    className={`interest-tag ${formData.preferences.interests.includes(interest) ? 'selected' : ''}`}
-                    onClick={() => toggleInterest(interest)}
-                  >
-                    {interest}
-                  </span>
-                ))}
-              </div>
+              <InterestsEditor
+                interests={formData.preferences.interests}
+                onChange={(updated) => setFormData(prev => ({
+                  ...prev,
+                  preferences: { ...prev.preferences, interests: updated },
+                }))}
+              />
             </div>
 
             <div className="form-group">
@@ -562,10 +543,10 @@ function UserProfile({ onBack }) {
           {saveMessage && <p className="save-success-msg">{saveMessage}</p>}
 
           <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={onBack}>
-              {t('eventCancel')}
+            <button type="button" className="btn btn-secondary" onClick={onBack}>
+              {t('cancelForm')}
             </button>
-            <button type="submit" className="btn-primary" disabled={loading}>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? '...' : t('saveProfile')}
             </button>
           </div>

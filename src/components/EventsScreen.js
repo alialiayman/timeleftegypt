@@ -62,6 +62,7 @@ export default function EventsScreen() {
 
   // Presence/late status loading
   const [presenceLoading, setPresenceLoading] = useState(false);
+  const isDev = process.env.NODE_ENV !== 'production';
 
   const canCreate = !!(currentUser && userProfile);
 
@@ -87,18 +88,28 @@ export default function EventsScreen() {
     if (isAdmin()) {
       q = query(collection(db, 'events'), orderBy('dateTime', 'asc'));
     } else {
-      q = query(
-        collection(db, 'events'),
-        where('status', '==', 'published'),
-        orderBy('dateTime', 'asc')
-      );
+      // Avoid a composite where+orderBy query that requires a manual Firestore index.
+      // Single-field equality queries are auto-indexed; sorting is done client-side.
+      const userLocalityId = userProfile?.localityId || '';
+      q = userLocalityId
+        ? query(collection(db, 'events'), where('localityId', '==', userLocalityId))
+        : query(collection(db, 'events'), where('status', '==', 'published'));
     }
     const unsub = onSnapshot(q, (snap) => {
-      setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ad = a?.dateTime || '';
+        const bd = b?.dateTime || '';
+        return ad > bd ? 1 : -1;
+      });
+      setEvents(list);
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => {
+      console.error('Error loading events:', err);
+      setLoading(false);
+    });
     return unsub;
-  }, [isAdmin, currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAdmin, currentUser, userProfile?.localityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [myPendingEvents, setMyPendingEvents] = useState([]);
   useEffect(() => {
@@ -486,6 +497,9 @@ export default function EventsScreen() {
         ...events.filter(ev => eventMatchesUserLocality(ev)),
         ...myPendingEvents.filter(pe => !events.some(e => e.id === pe.id)),
       ];
+  const localityMatchedPublishedCount = !isAdmin()
+    ? events.filter(ev => ev.status === 'published' && eventMatchesUserLocality(ev)).length
+    : 0;
 
   if (loading) {
     return (
@@ -840,6 +854,12 @@ export default function EventsScreen() {
       </div>
 
       {message && <div className="message-banner">{message}</div>}
+
+      {!isAdmin() && isDev && (
+        <div className="info-note" style={{ marginBottom: '0.75rem' }}>
+          Debug: localityId={userProfile?.localityId || '—'} | localityLabel={userProfile?.localityLabel || '—'} | publishedLoaded={events.length} | localityMatchedPublished={localityMatchedPublishedCount} | visibleTotal={allVisibleEvents.length}
+        </div>
+      )}
 
       {showCreateForm && canCreate && (
         <div className="card create-event-form">

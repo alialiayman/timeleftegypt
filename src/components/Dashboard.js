@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import {
-  collection, query, where, onSnapshot, getDocs, documentId, orderBy
+  collection, query, where, onSnapshot, getDocs, documentId
 } from 'firebase/firestore';
 import { BOOKING_STATUS } from '../models';
 import InterestsEditor from './InterestsEditor';
@@ -38,6 +38,7 @@ function Dashboard({ setCurrentView }) {
   const [interests, setInterests] = useState([]);
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsMessage, setInterestsMessage] = useState('');
+  const isDev = process.env.NODE_ENV !== 'production';
 
   // Sync interests from userProfile
   useEffect(() => {
@@ -107,24 +108,32 @@ function Dashboard({ setCurrentView }) {
       return;
     }
 
-    const now = new Date().toISOString();
-    const q = query(
-      collection(db, 'events'),
-      where('status', '==', 'published'),
-      orderBy('dateTime', 'asc')
-    );
+    // Use a single-field equality query on localityId — Firestore auto-indexes all
+    // single fields so no composite index is required. Sorting is done client-side.
+    // A composite (status + dateTime) query needs a manual Firestore index and
+    // fails silently when absent, showing an empty list.
+    const q = userLocalityId
+      ? query(collection(db, 'events'), where('localityId', '==', userLocalityId))
+      : query(collection(db, 'events'), where('status', '==', 'published'));
 
     const unsub = onSnapshot(q, (snap) => {
+      const now = new Date().toISOString();
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const filtered = all.filter(ev => {
         if (!ev.dateTime || ev.dateTime < now) return false;
-        // Match by localityId (preferred, more robust) or fall back to label comparison
+        if (ev.status !== 'published') return false;
+        // When querying by localityId the match is already guaranteed;
+        // keep the label fallback for events that pre-date the localityId field.
         if (userLocalityId && ev.localityId) return ev.localityId === userLocalityId;
         return !!userLocality && ev.locality === userLocality;
       });
+      filtered.sort((a, b) => (a.dateTime > b.dateTime ? 1 : -1));
       setLocalityEvents(filtered);
       setLocalityEventsLoading(false);
-    }, () => setLocalityEventsLoading(false));
+    }, (err) => {
+      console.error('Error loading locality events:', err);
+      setLocalityEventsLoading(false);
+    });
 
     return unsub;
   }, [userProfile?.localityLabel, userProfile?.localityId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -227,6 +236,11 @@ function Dashboard({ setCurrentView }) {
       {/* Events in Your Locality */}
       <div className="events-section">
         <h3>📍 {t('localityEventsTitle')}</h3>
+        {isDev && (
+          <div className="info-note" style={{ marginBottom: '0.75rem' }}>
+            Debug: localityId={userProfile?.localityId || '—'} | localityLabel={userProfile?.localityLabel || '—'} | matchedEvents={localityEvents.length}
+          </div>
+        )}
 
         {!userProfile?.localityLabel && !userProfile?.localityId ? (
           <div className="empty-state">

@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
@@ -41,6 +42,15 @@ const firebaseConfig = {
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const firebaseAuth = getAuth(firebaseApp);
 const firestoreDb = getFirestore(firebaseApp);
+
+const GOOGLE_IOS_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  '52980912855-kdg74kapnfc53foj5lcg9g1iut1j8b3f.apps.googleusercontent.com';
+const GOOGLE_IOS_REDIRECT_SCHEME =
+  'com.googleusercontent.apps.52980912855-kdg74kapnfc53foj5lcg9g1iut1j8b3f';
+const GOOGLE_EXPO_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '';
+const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -170,27 +180,16 @@ function AppContent() {
     clearNativeSession,
   } = useNativeApp();
 
-  const expoClientId = process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || '';
-  const iosClientId =
-    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    'placeholder.apps.googleusercontent.com';
-  const androidClientId =
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    'placeholder.apps.googleusercontent.com';
-  const webClientId =
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
-    'placeholder.apps.googleusercontent.com';
+  const redirectUri = makeRedirectUri({
+    native: `${GOOGLE_IOS_REDIRECT_SCHEME}:/oauthredirect`,
+  });
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId,
-    iosClientId,
-    androidClientId,
-    webClientId,
+    expoClientId: GOOGLE_EXPO_CLIENT_ID || undefined,
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
+    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
+    redirectUri: Platform.OS === 'ios' ? redirectUri : undefined,
     scopes: ['openid', 'profile', 'email'],
   });
 
@@ -264,15 +263,17 @@ function AppContent() {
 
   const signInWithGoogle = async () => {
     const hasGoogleClientConfig = Boolean(
-      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+      Platform.OS === 'ios'
+        ? GOOGLE_IOS_CLIENT_ID
+        : GOOGLE_ANDROID_CLIENT_ID || GOOGLE_EXPO_CLIENT_ID || GOOGLE_WEB_CLIENT_ID
     );
 
     if (!hasGoogleClientConfig) {
       Alert.alert(
         'Google client ID missing',
-        'Set EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (or EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID) in your environment before using native Google login.'
+        Platform.OS === 'ios'
+          ? 'The iOS Google client ID is missing. Add EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID or update the hard-coded fallback to match the iOS OAuth client in Google Cloud.'
+          : 'Set the native Google client IDs in your environment before using Google login on this device.'
       );
       return;
     }
@@ -280,7 +281,7 @@ function AppContent() {
     setIsSigningIn(true);
     setLoginRequested(true);
     handledAuthResponseRef.current = null;
-    await promptAsync();
+    await promptAsync({ useProxy: false });
   };
 
   const signOutNative = useCallback(async () => {

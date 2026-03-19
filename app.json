@@ -2,6 +2,16 @@
   "scheme": "com.timeleftgatherly.app",
   "ios": {
     "bundleIdentifier": "com.timeleftgatherly.app",
-    "googleServicesFile": "./GoogleService-Info.plist"
+    "googleServicesFile": "./GoogleService-Info.plist",
+    "infoPlist": {
+      "CFBundleURLTypes": [
+        {
+          "CFBundleURLSchemes": [
+            "com.timeleftgatherly.app",
+            "com.googleusercontent.apps.52980912855-kdg74kapnfc53foj5lcg9g1iut1j8b3f"
+          ]
+        }
+      ]
+    }
   }
 }

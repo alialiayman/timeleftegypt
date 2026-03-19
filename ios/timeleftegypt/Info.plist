@@ -28,6 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>com.timeleftgatherly.app</string>
+          <string>com.googleusercontent.apps.52980912855-kdg74kapnfc53foj5lcg9g1iut1j8b3f</string>
         </array>
       </dict>
     </array>

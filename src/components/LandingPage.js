@@ -177,7 +177,7 @@ function LandingPage() {
                 <span className="lp-mockup__dot lp-mockup__dot--red" />
                 <span className="lp-mockup__dot lp-mockup__dot--yellow" />
                 <span className="lp-mockup__dot lp-mockup__dot--green" />
-                <span className="lp-mockup__title">🌟 Gatherly</span>
+                <span className="lp-mockup__title">🌟 TimeLeft Gatherly</span>
               </div>
               <div className="lp-mockup__body">
                 <div className="lp-mockup__card">

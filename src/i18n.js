@@ -5,7 +5,7 @@ const resources = {
   en: {
     translation: {
       // App
-      appName: 'Gatherly',
+      appName: 'TimeLeft Gatherly',
       loading: 'Loading...',
       loadingProfile: 'Loading profile...',
       welcome: 'Welcome, {{name}}!',
@@ -406,7 +406,7 @@ const resources = {
   ar: {
     translation: {
       // App
-      appName: 'غاذرلي',
+      appName: 'TimeLeft Gatherly',
       loading: 'جارٍ التحميل...',
       loadingProfile: 'جارٍ تحميل الملف الشخصي...',
       welcome: 'أهلاً، {{name}}!',

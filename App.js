@@ -73,7 +73,7 @@ function AuthScreen({ request, isSigningIn, onSignIn }) {
   return (
     <AuthShell>
       <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Gatherly</Text>
+        <Text style={styles.heroEyebrow}>TimeLeft Gatherly</Text>
         <Text style={styles.title}>Meet Better. Live More.</Text>
         <Text style={styles.subtitle}>Join curated local events, discover your people, and turn plans into memories.</Text>
         <View style={styles.valueList}>

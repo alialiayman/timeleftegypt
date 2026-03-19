@@ -1,357 +1,300 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-  orderBy, writeBatch
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
 } from 'firebase/firestore';
-import { notifyOrganizerAssigned } from '../services/emailService';
+import { useNativeApp } from '../contexts/NativeAppContext';
 
-const USERS_PAGE_SIZE = 20;
+const EMPTY_FORM = { country: '', city: '', area: '', adminIds: [] };
 
-export default function SuperAdminPanel({ onBack }) {
-  const { t } = useTranslation();
-  const { isSuperAdmin, users } = useAuth();
+function UserCheck({ item, selected, onToggle }) {
+  return (
+    <Pressable style={[styles.userCheck, selected && styles.userCheckActive]} onPress={() => onToggle(item.id)}>
+      <Text style={[styles.userCheckName, selected && styles.userCheckNameActive]}>{item.displayName || item.name || item.email || item.id}</Text>
+      <Text style={styles.userCheckMeta}>{item.email || '-'}</Text>
+    </Pressable>
+  );
+}
 
+export default function SuperAdminPanelScreen() {
+  const { db } = useNativeApp();
   const [localities, setLocalities] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [message, setMessage] = useState('');
+  const [editingId, setEditingId] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const emptyForm = { country: '', city: '', area: '', adminIds: [] };
-  const [form, setForm] = useState(emptyForm);
-  const [adminSearch, setAdminSearch] = useState('');
-  const [usersPageSize, setUsersPageSize] = useState(USERS_PAGE_SIZE);
-
-  // Load localities in real-time
   useEffect(() => {
-    const q = query(collection(db, 'localities'), orderBy('country'));
-    const unsub = onSnapshot(q, (snap) => {
-      setLocalities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    if (!db) return undefined;
+    const q1 = query(collection(db, 'localities'), orderBy('country'));
+    const q2 = query(collection(db, 'users'), orderBy('displayName'));
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      setLocalities(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
-    return unsub;
-  }, []);
-
-  const showMsg = (msg) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
-  };
-
-  const handleEdit = (locality) => {
-    setEditingId(locality.id);
-    setForm({
-      country: locality.country || '',
-      city: locality.city || '',
-      area: locality.area || '',
-      adminIds: locality.adminIds || [],
     });
-    setShowForm(true);
-  };
+    const unsub2 = onSnapshot(q2, (snap) => {
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
 
-  const handleCancelForm = () => {
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, [db]);
+
+  const filteredUsers = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter((u) => {
+      const name = (u.displayName || u.name || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(term) || email.includes(term);
+    });
+  }, [users, search]);
+
+  const resetForm = () => {
     setShowForm(false);
-    setEditingId(null);
-    setForm(emptyForm);
-    setAdminSearch('');
-    setUsersPageSize(USERS_PAGE_SIZE);
+    setEditingId('');
+    setForm(EMPTY_FORM);
+    setSearch('');
   };
 
-  /**
-   * Sync organizerLocalityId on user documents whenever locality adminIds change.
-   * Added users get organizerLocalityId set; removed users get it cleared
-   * (only if it still points to this locality).
-   * Also queues email notifications for newly-assigned organizers.
-   */
-  const syncOrganizerLocality = async (localityId, localityLabel, newAdminIds, oldAdminIds = []) => {
-    const batch = writeBatch(db);
-    const added = newAdminIds.filter(id => !oldAdminIds.includes(id));
-    const removed = oldAdminIds.filter(id => !newAdminIds.includes(id));
+  const openNew = () => {
+    setShowForm(true);
+    setEditingId('');
+    setForm(EMPTY_FORM);
+  };
 
-    added.forEach(uid => {
-      batch.update(doc(db, 'users', uid), {
-        organizerLocalityId: localityId,
-        organizerLocalityLabel: localityLabel,
-        lastUpdated: new Date().toISOString(),
-      });
+  const openEdit = (loc) => {
+    setShowForm(true);
+    setEditingId(loc.id);
+    setForm({
+      country: loc.country || '',
+      city: loc.city || '',
+      area: loc.area || '',
+      adminIds: loc.adminIds || [],
     });
-    removed.forEach(uid => {
-      batch.update(doc(db, 'users', uid), {
-        organizerLocalityId: '',
-        organizerLocalityLabel: '',
-        lastUpdated: new Date().toISOString(),
-      });
-    });
+  };
 
-    if (added.length > 0 || removed.length > 0) {
-      await batch.commit();
-    }
+  const toggleAdminId = (uid) => {
+    setForm((prev) => ({
+      ...prev,
+      adminIds: prev.adminIds.includes(uid) ? prev.adminIds.filter((id) => id !== uid) : [...prev.adminIds, uid],
+    }));
+  };
 
-    // Queue email notifications for newly-assigned organizers
+  const syncOrganizerLocalities = async (localityId, localityLabel, newAdminIds, oldAdminIds) => {
+    const added = newAdminIds.filter((id) => !oldAdminIds.includes(id));
+    const removed = oldAdminIds.filter((id) => !newAdminIds.includes(id));
+
     for (const uid of added) {
-      const user = users.find(u => u.id === uid);
-      if (user?.email) {
-        try {
-          await notifyOrganizerAssigned({
-            email: user.email,
-            displayName: user.displayName || user.name || '',
-            localityLabel,
-          });
-        } catch (err) {
-          console.error('Failed to queue organizer assignment email:', err);
-        }
-      }
+      await setDoc(
+        doc(db, 'users', uid),
+        {
+          organizerLocalityId: localityId,
+          organizerLocalityLabel: localityLabel,
+          role: 'admin',
+          lastUpdated: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+
+    for (const uid of removed) {
+      const userDoc = doc(db, 'users', uid);
+      const userSnap = await getDoc(userDoc);
+      const currentRole = userSnap.exists() ? userSnap.data()?.role || '' : '';
+      const nextRole = currentRole === 'admin' || currentRole === 'event_admin' ? '' : currentRole;
+      await setDoc(
+        userDoc,
+        {
+          organizerLocalityId: '',
+          organizerLocalityLabel: '',
+          role: nextRole,
+          lastUpdated: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     }
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
+  const saveForm = async () => {
+    if (!form.country.trim() || !form.city.trim() || !form.area.trim()) return;
+    setSaving(true);
     try {
-      const data = {
+      const payload = {
         country: form.country.trim(),
         city: form.city.trim(),
         area: form.area.trim(),
         adminIds: form.adminIds,
         lastUpdated: new Date().toISOString(),
       };
-      const localityLabel = `${data.country} → ${data.city} → ${data.area}`;
+      const label = `${payload.country} -> ${payload.city} -> ${payload.area}`;
 
       if (editingId) {
-        // Determine previous adminIds to sync changes
-        const prevLocality = localities.find(l => l.id === editingId);
-        const oldAdminIds = prevLocality?.adminIds || [];
-        await updateDoc(doc(db, 'localities', editingId), data);
-        await syncOrganizerLocality(editingId, localityLabel, form.adminIds, oldAdminIds);
-        showMsg(t('localityUpdated'));
+        const prev = localities.find((l) => l.id === editingId);
+        const oldAdminIds = prev?.adminIds || [];
+        await updateDoc(doc(db, 'localities', editingId), payload);
+        await syncOrganizerLocalities(editingId, label, payload.adminIds, oldAdminIds);
       } else {
-        const newRef = await addDoc(collection(db, 'localities'), {
-          ...data,
+        const ref = await addDoc(collection(db, 'localities'), {
+          ...payload,
           createdAt: new Date().toISOString(),
         });
-        await syncOrganizerLocality(newRef.id, localityLabel, form.adminIds, []);
-        showMsg(t('localityAdded'));
+        await syncOrganizerLocalities(ref.id, label, payload.adminIds, []);
       }
-      handleCancelForm();
-    } catch (err) {
-      console.error('Save locality error:', err);
-      showMsg(t('errorGeneral'));
+
+      resetForm();
+    } catch (error) {
+      console.error('Save locality failed:', error);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('deleteLocality') + '?')) return;
+  const removeLocality = async (loc) => {
     try {
-      // Clear organizerLocalityId for all admins assigned to this locality
-      const locality = localities.find(l => l.id === id);
-      if (locality?.adminIds?.length > 0) {
-        await syncOrganizerLocality(id, '', [], locality.adminIds);
-      }
-      await deleteDoc(doc(db, 'localities', id));
-      showMsg(t('localityDeleted'));
-    } catch (err) {
-      console.error('Delete locality error:', err);
-      showMsg(t('errorGeneral'));
+      const oldAdmins = loc.adminIds || [];
+      await syncOrganizerLocalities(loc.id, '', [], oldAdmins);
+      await deleteDoc(doc(db, 'localities', loc.id));
+    } catch (error) {
+      console.error('Delete locality failed:', error);
     }
   };
 
-  const toggleAdmin = (userId) => {
-    setForm(prev => ({
-      ...prev,
-      adminIds: prev.adminIds.includes(userId)
-        ? prev.adminIds.filter(id => id !== userId)
-        : [...prev.adminIds, userId],
-    }));
-  };
-
-  const filteredUsers = users.filter(u =>
-    adminSearch === '' ||
-    (u.displayName || u.name || '').toLowerCase().includes(adminSearch.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(adminSearch.toLowerCase())
-  );
-
-  const visibleUsers = filteredUsers.slice(0, usersPageSize);
-  const hasMoreUsers = filteredUsers.length > usersPageSize;
-
-  if (!isSuperAdmin()) {
+  if (loading) {
     return (
-      <div className="admin-panel">
-        <div className="access-denied">
-          <h2>⛔ Access Denied</h2>
-          <p>You need Master access for this panel.</p>
-          <button className="btn btn-primary" onClick={onBack}>
-            {t('dashboard')}
-          </button>
-        </div>
-      </div>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#f97316" />
+      </View>
     );
   }
 
   return (
-    <div className="super-admin-panel admin-panel">
-      <div className="admin-header">
-        <button className="back-btn" onClick={onBack}>
-          ← {t('dashboard')}
-        </button>
-        <h2>{t('superAdminPanel')}</h2>
-      </div>
+    <ScrollView contentContainerStyle={styles.screen}>
+      <Text style={styles.title}>Master Panel</Text>
 
-      {message && <div className="message-banner">{message}</div>}
+      <View style={styles.actionsTop}>
+        <Pressable style={styles.primaryButton} onPress={openNew}>
+          <Text style={styles.primaryButtonText}>Add Locality</Text>
+        </Pressable>
+      </View>
 
-      <div className="admin-content">
-        {/* Localities Management */}
-        <div className="admin-section">
-          <div className="section-header-row">
-            <h3>🌍 {t('localities')}</h3>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm); }}
-            >
-              + {t('addLocality')}
-            </button>
-          </div>
+      {showForm ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{editingId ? 'Edit Locality' : 'New Locality'}</Text>
 
-          {/* Locality Form */}
-          {showForm && (
-            <div className="card locality-form">
-              <h4>{editingId ? t('editLocality') : t('addLocality')}</h4>
-              <form onSubmit={handleSave}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>{t('localityCountry')}</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.country}
-                      onChange={e => setForm(p => ({ ...p, country: e.target.value }))}
-                      placeholder="e.g. Egypt"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>{t('localityCity')}</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.city}
-                      onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
-                      placeholder="e.g. Cairo"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>{t('localityArea')}</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.area}
-                      onChange={e => setForm(p => ({ ...p, area: e.target.value }))}
-                      placeholder="e.g. New Cairo"
-                    />
-                  </div>
-                </div>
+          <Text style={styles.label}>Country</Text>
+          <TextInput style={styles.input} value={form.country} onChangeText={(v) => setForm((p) => ({ ...p, country: v }))} />
 
-                {/* Assign Admins */}
-                <div className="form-group">
-                  <label>{t('assignAdmin')}</label>
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    value={adminSearch}
-                    onChange={e => setAdminSearch(e.target.value)}
-                    className="search-input"
-                  />
-                  <div className="users-checklist">
-                    {visibleUsers.map(u => (
-                      <label key={u.id} className="user-check-item">
-                        <input
-                          type="checkbox"
-                          checked={form.adminIds.includes(u.id)}
-                          onChange={() => toggleAdmin(u.id)}
-                        />
-                        <span>{u.displayName || u.name || u.email}</span>
-                        {u.role === 'admin' || u.role === 'event_admin' ? (
-                          <span className="role-badge admin-badge">{t('roleAdmin')}</span>
-                        ) : null}
-                      </label>
-                    ))}
-                    {filteredUsers.length === 0 && (
-                      <p className="no-results">No users found.</p>
-                    )}
-                    {hasMoreUsers && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm load-more-btn"
-                        onClick={() => setUsersPageSize(prev => prev + USERS_PAGE_SIZE)}
-                      >
-                        {t('loadMore')} ({filteredUsers.length - usersPageSize} more)
-                      </button>
-                    )}
-                  </div>
-                </div>
+          <Text style={styles.label}>City</Text>
+          <TextInput style={styles.input} value={form.city} onChangeText={(v) => setForm((p) => ({ ...p, city: v }))} />
 
-                <div className="form-actions">
-                  <button type="button" className="btn btn-secondary" onClick={handleCancelForm}>
-                    {t('cancelForm')}
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    {t('saveLocality')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+          <Text style={styles.label}>Area</Text>
+          <TextInput style={styles.input} value={form.area} onChangeText={(v) => setForm((p) => ({ ...p, area: v }))} />
 
-          {/* Localities Table */}
-          {loading ? (
-            <div className="loading-container" style={{ height: 'auto', padding: '2rem' }}>
-              <div className="loading-spinner"></div>
-            </div>
-          ) : localities.length === 0 ? (
-            <div className="empty-state">
-              <p>{t('noLocalities')}</p>
-            </div>
-          ) : (
-            <div className="localities-table">
-              <div className="table-header localities-header">
-                <span>{t('localityCountry')}</span>
-                <span>{t('localityCity')}</span>
-                <span>{t('localityArea')}</span>
-                <span>{t('localityAdminIds')}</span>
-                <span></span>
-              </div>
-              {localities.map(loc => {
-                const assignedAdmins = users.filter(u => (loc.adminIds || []).includes(u.id));
-                return (
-                  <div key={loc.id} className="table-row localities-row">
-                    <span>{loc.country}</span>
-                    <span>{loc.city}</span>
-                    <span>{loc.area}</span>
-                    <span className="admin-names">
-                      {assignedAdmins.length > 0
-                        ? assignedAdmins.map(a => a.displayName || a.name || a.email).join(', ')
-                        : '—'}
-                    </span>
-                    <span className="row-actions">
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleEdit(loc)}
-                      >
-                        ✏️ {t('editLocality')}
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDelete(loc.id)}
-                      >
-                        🗑️ {t('deleteLocality')}
-                      </button>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+          <Text style={styles.label}>Assign Organizers</Text>
+          <TextInput
+            style={styles.input}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search users"
+          />
+
+          <FlatList
+            data={filteredUsers.slice(0, 30)}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <UserCheck item={item} selected={form.adminIds.includes(item.id)} onToggle={toggleAdminId} />
+            )}
+            style={styles.userList}
+            scrollEnabled={false}
+          />
+
+          <View style={styles.formActions}>
+            <Pressable style={[styles.primaryButton, saving && styles.disabled]} onPress={saveForm} disabled={saving}>
+              <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={resetForm}>
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Localities</Text>
+        {localities.length === 0 ? <Text style={styles.empty}>No localities yet.</Text> : null}
+        {localities.map((loc) => {
+          const admins = users.filter((u) => (loc.adminIds || []).includes(u.id));
+          return (
+            <View key={loc.id} style={styles.localityRow}>
+              <Text style={styles.localityTitle}>{loc.country}{' -> '}{loc.city}{' -> '}{loc.area}</Text>
+              <Text style={styles.localityMeta}>Organizers: {admins.length ? admins.map((a) => a.displayName || a.name || a.email).join(', ') : '-'}</Text>
+              <View style={styles.rowButtons}>
+                <Pressable style={styles.secondaryButton} onPress={() => openEdit(loc)}>
+                  <Text style={styles.secondaryButtonText}>Edit</Text>
+                </Pressable>
+                <Pressable style={styles.dangerButton} onPress={() => removeLocality(loc)}>
+                  <Text style={styles.dangerButtonText}>Delete</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { paddingHorizontal: 16, paddingBottom: 20 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 26, fontWeight: '700', color: '#9a3412', marginBottom: 10 },
+  actionsTop: { marginBottom: 10 },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: '#fdba74', backgroundColor: '#fff', padding: 14, marginBottom: 12 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#9a3412', marginBottom: 8 },
+  label: { fontSize: 14, color: '#7c2d12', fontWeight: '600', marginBottom: 6, marginTop: 8 },
+  input: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#9a3412', backgroundColor: '#fff' },
+  userList: { marginTop: 8 },
+  userCheck: { borderWidth: 1, borderColor: '#fed7aa', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff7ed' },
+  userCheckActive: { borderColor: '#f97316', backgroundColor: '#ffedd5' },
+  userCheckName: { fontSize: 14, fontWeight: '600', color: '#7c2d12' },
+  userCheckNameActive: { color: '#f97316' },
+  userCheckMeta: { fontSize: 12, color: '#546b88', marginTop: 2 },
+  formActions: { marginTop: 8 },
+  primaryButton: { backgroundColor: '#f97316', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  secondaryButton: { backgroundColor: '#fff1e6', borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  secondaryButtonText: { color: '#9a3412', textAlign: 'center', fontWeight: '600', fontSize: 13 },
+  dangerButton: { backgroundColor: '#fbe9e8', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  dangerButtonText: { color: '#8f1f1a', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  localityRow: { borderWidth: 1, borderColor: '#fed7aa', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff7ed' },
+  localityTitle: { fontSize: 14, fontWeight: '700', color: '#7c2d12' },
+  localityMeta: { fontSize: 12, color: '#546b88', marginTop: 3 },
+  rowButtons: { flexDirection: 'row', gap: 8 },
+  empty: { fontSize: 14, color: '#9a3412' },
+  disabled: { opacity: 0.6 },
+});

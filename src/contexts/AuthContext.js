@@ -20,6 +20,8 @@ import {
 
 const AuthContext = createContext();
 
+export { AuthContext };
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -564,6 +566,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = {
+    db,
     currentUser,
     userProfile,
     users,

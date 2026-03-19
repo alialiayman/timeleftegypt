@@ -1,515 +1,246 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  collection, query, where, onSnapshot, getDocs, documentId
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
 } from 'firebase/firestore';
-import { BOOKING_STATUS } from '../models';
-import InterestsEditor from './InterestsEditor';
+import { useNativeApp } from '../contexts/NativeAppContext';
 
-const EVENT_TYPE_ICONS = {
-  dinner: '🍽️',
-  breakfast: '☀️',
-  lunch: '🌤️',
-  movie_night: '🎬',
-  paddle: '🏓',
-  soiree: '✨',
-  coffee_meetup: '☕',
-  library_meetup: '📚',
-};
-
-function Dashboard({ setCurrentView }) {
-  const { t } = useTranslation();
-  const {
-    userProfile,
-    currentUser,
-    logout,
-    updateUserProfile,
-  } = useAuth();
-
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
-
-  // Locality-based event discovery
-  const [localityEvents, setLocalityEvents] = useState([]);
-  const [localityEventsLoading, setLocalityEventsLoading] = useState(true);
-
-  // Interests editing state
-  const [interests, setInterests] = useState([]);
-  const [interestsSaving, setInterestsSaving] = useState(false);
-  const [interestsMessage, setInterestsMessage] = useState('');
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  // Incoming connection requests for notification badge
-  const [pendingConnectionCount, setPendingConnectionCount] = useState(0);
-  // Accepted connection requests to notify requester
-  const [acceptedConnections, setAcceptedConnections] = useState([]);
-  const [acceptedProfiles, setAcceptedProfiles] = useState({});
-
-  // Sync interests from userProfile
-  useEffect(() => {
-    if (userProfile) {
-      const raw = userProfile.preferences?.interests;
-      if (Array.isArray(raw)) {
-        setInterests(raw);
-      } else if (typeof raw === 'string' && raw.trim()) {
-        // Legacy: comma-separated string
-        setInterests(raw.split(',').map(s => s.trim()).filter(Boolean));
-      } else {
-        setInterests([]);
-      }
-    }
-  }, [userProfile]);
-
-  // Listen for incoming (pending) connection requests — for notification badge
-  useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'contactPermissions'),
-      where('targetUserId', '==', currentUser.uid),
-      where('status', '==', 'pending')
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setPendingConnectionCount(snap.size);
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
-
-  // Listen for accepted connection requests sent BY current user — to notify requester
-  useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'contactPermissions'),
-      where('requesterId', '==', currentUser.uid),
-      where('status', '==', 'approved')
-    );
-    const unsub = onSnapshot(q, async (snap) => {
-      const approved = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setAcceptedConnections(approved);
-      // Load target user profiles so we can show name + phone
-      const targetIds = [...new Set(approved.map(r => r.targetUserId))];
-      if (targetIds.length === 0) { setAcceptedProfiles({}); return; }
-      try {
-        const profiles = {};
-        for (let i = 0; i < targetIds.length; i += 10) {
-          const batch = targetIds.slice(i, i + 10);
-          const snap2 = await getDocs(
-            query(collection(db, 'users'), where(documentId(), 'in', batch))
-          );
-          snap2.docs.forEach(d => { profiles[d.id] = { id: d.id, ...d.data() }; });
-        }
-        setAcceptedProfiles(profiles);
-      } catch (err) {
-        console.error('Error loading accepted profiles:', err);
-      }
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
-
-  // Load upcoming RSVP'd events
-  useEffect(() => {
-    if (!userProfile?.id) return;
-
-    const bookingsQ = query(
-      collection(db, 'bookings'),
-      where('userId', '==', userProfile.id),
-      where('status', '==', BOOKING_STATUS.CONFIRMED)
-    );
-
-    const unsub = onSnapshot(bookingsQ, async (snap) => {
-      const now = new Date().toISOString();
-      const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      if (bookings.length === 0) {
-        setUpcomingEvents([]);
-        setEventsLoading(false);
-        return;
-      }
-
-      const eventIds = bookings.map(b => b.eventId);
-      // Batch fetch events using 'in' queries (max 10 per batch)
-      const eventMap = {};
-      for (let i = 0; i < eventIds.length; i += 10) {
-        const batch = eventIds.slice(i, i + 10);
-        const evSnap = await getDocs(
-          query(collection(db, 'events'), where(documentId(), 'in', batch))
-        );
-        evSnap.docs.forEach(d => { eventMap[d.id] = { id: d.id, ...d.data() }; });
-      }
-
-      // Filter to upcoming, non-cancelled events
-      const events = Object.values(eventMap).filter(
-        ev => ev.dateTime && ev.dateTime >= now && ev.status !== 'cancelled'
-      );
-      events.sort((a, b) => (a.dateTime > b.dateTime ? 1 : -1));
-      setUpcomingEvents(events);
-      setEventsLoading(false);
-    }, () => setEventsLoading(false));
-
-    return unsub;
-  }, [userProfile?.id]);
-
-  // Load published events in the Friend's chosen locality
-  useEffect(() => {
-    const userLocality = userProfile?.localityLabel || '';
-    const userLocalityId = userProfile?.localityId || '';
-    if (!userLocality && !userLocalityId) {
-      setLocalityEvents([]);
-      setLocalityEventsLoading(false);
-      return;
-    }
-
-    // Use a single-field equality query on localityId — Firestore auto-indexes all
-    // single fields so no composite index is required. Sorting is done client-side.
-    // A composite (status + dateTime) query needs a manual Firestore index and
-    // fails silently when absent, showing an empty list.
-    const q = userLocalityId
-      ? query(collection(db, 'events'), where('localityId', '==', userLocalityId))
-      : query(collection(db, 'events'), where('status', '==', 'published'));
-
-    const unsub = onSnapshot(q, (snap) => {
-      const now = new Date().toISOString();
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const filtered = all.filter(ev => {
-        if (!ev.dateTime || ev.dateTime < now) return false;
-        if (ev.status !== 'published') return false;
-        // When querying by localityId the match is already guaranteed;
-        // keep the label fallback for events that pre-date the localityId field.
-        if (userLocalityId && ev.localityId) return ev.localityId === userLocalityId;
-        return !!userLocality && ev.locality === userLocality;
-      });
-      filtered.sort((a, b) => (a.dateTime > b.dateTime ? 1 : -1));
-      setLocalityEvents(filtered);
-      setLocalityEventsLoading(false);
-    }, (err) => {
-      console.error('Error loading locality events:', err);
-      setLocalityEventsLoading(false);
-    });
-
-    return unsub;
-  }, [userProfile?.localityLabel, userProfile?.localityId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleLogout = async () => {
-    if (window.confirm(t('logout') + '?')) {
-      try {
-        await logout();
-      } catch (error) {
-        console.error('Error during logout:', error);
-      }
-    }
-  };
-
-  const getLocationDisplay = () => {
-    if (userProfile?.localityLabel) return `📍 ${userProfile.localityLabel}`;
-    if (userProfile?.city) return `📍 ${userProfile.city}`;
-    return '📍 —';
-  };
-
-  const handleSaveInterests = async () => {
-    try {
-      setInterestsSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...userProfile?.preferences,
-          interests,
-        },
-      });
-      setInterestsMessage(t('interestsSaved'));
-      setTimeout(() => setInterestsMessage(''), 3000);
-    } catch (err) {
-      console.error('Error saving interests:', err);
-    } finally {
-      setInterestsSaving(false);
-    }
-  };
-
+function SectionCard({ title, children }) {
   return (
-    <div className="dashboard">
-      {/* Notification: Incoming connection requests */}
-      {pendingConnectionCount > 0 && (
-        <div className="connection-notification-banner">
-          <span>🔔 {t('pendingConnectionRequests')}: <strong>{pendingConnectionCount}</strong></span>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => setCurrentView('profile')}
-          >
-            {t('acceptRequest')} / {t('rejectRequest')}
-          </button>
-        </div>
-      )}
-
-      {/* Notification: Accepted connections (requester side) */}
-      {acceptedConnections.length > 0 && (
-        <div className="accepted-connections-section">
-          <h4>🎉 {t('connectRequestApproved')}</h4>
-          {acceptedConnections.map(conn => {
-            const profile = acceptedProfiles[conn.targetUserId];
-            if (!profile) return null;
-            const name = profile.displayName || profile.name || conn.targetUserId;
-            return (
-              <div key={conn.id} className="accepted-connection-item">
-                <p>{t('phoneRevealedAlert', { name })}</p>
-                {profile.phoneNumber && (
-                  <div className="phone-reveal">
-                    <span className="phone-number">
-                      📞 {t('phoneNumber')}: <strong>{profile.phoneNumber}</strong>
-                    </span>
-                    <a
-                      href={`https://wa.me/${profile.phoneNumber.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary btn-sm whatsapp-btn"
-                    >
-                      💬 {t('callOrWhatsApp')}
-                    </a>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Profile Header */}
-      <div className="dashboard-header">
-        <div className="user-info">
-          <div className="user-avatar">
-            {userProfile?.photoURL ? (
-              <img src={userProfile.photoURL} alt="Profile" />
-            ) : (
-              <div className="avatar-placeholder">
-                {(userProfile?.displayName || userProfile?.name || 'U')[0].toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div className="user-details">
-            <h2>{userProfile?.displayName || userProfile?.name || 'User'}</h2>
-            {userProfile?.fullName && userProfile.fullName !== userProfile.displayName && (
-              <p className="full-name">{userProfile.fullName}</p>
-            )}
-            <p className="location">{getLocationDisplay()}</p>
-            {userProfile?.gender && (
-              <p className="gender">{userProfile.gender}</p>
-            )}
-          </div>
-          <div className="user-actions">
-            <button
-              className="btn btn-secondary"
-              onClick={() => setCurrentView('profile')}
-            >
-              {t('editProfile')}
-            </button>
-            <button className="btn btn-danger" onClick={handleLogout}>
-              {t('logout')}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Interests Section */}
-      <div className="interests-section">
-        <h3>{t('yourInterests')}</h3>
-
-        <InterestsEditor
-          interests={interests}
-          onChange={setInterests}
-        />
-
-        <div className="interests-add-row">
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={handleSaveInterests}
-            disabled={interestsSaving}
-          >
-            {interestsSaving ? '...' : t('saveInterests')}
-          </button>
-        </div>
-        {interestsMessage && (
-          <p className="interests-saved-msg">{interestsMessage}</p>
-        )}
-      </div>
-
-      {/* Events in Your Locality */}
-      <div className="events-section">
-        <h3>📍 {t('localityEventsTitle')}</h3>
-        {isDev && (
-          <div className="info-note" style={{ marginBottom: '0.75rem' }}>
-            Debug: localityId={userProfile?.localityId || '—'} | localityLabel={userProfile?.localityLabel || '—'} | matchedEvents={localityEvents.length}
-          </div>
-        )}
-
-        {!userProfile?.localityLabel && !userProfile?.localityId ? (
-          <div className="empty-state">
-            <p>{t('setLocalityPrompt')}</p>
-            <button
-              className="btn btn-secondary"
-              onClick={() => setCurrentView('profile')}
-            >
-              {t('editProfile')}
-            </button>
-          </div>
-        ) : localityEventsLoading ? (
-          <div className="loading-container" style={{ height: 'auto', padding: '2rem' }}>
-            <div className="loading-spinner"></div>
-          </div>
-        ) : localityEvents.length === 0 ? (
-          <div className="empty-state">
-            <p>{t('noLocalityEvents')}</p>
-          </div>
-        ) : (
-          <div className="events-grid">
-            {localityEvents.map(event => (
-              <div key={event.id} className="event-card">
-                <div className="event-header">
-                  <div className="event-title">
-                    <span className="event-emoji">
-                      {EVENT_TYPE_ICONS[event.type] || '🎉'}
-                    </span>
-                    <h4>{event.title}</h4>
-                  </div>
-                </div>
-
-                <div className="event-details">
-                  <div className="event-detail">
-                    <span className="detail-icon">📅</span>
-                    <span className="detail-text">
-                      {event.dateTime
-                        ? new Date(event.dateTime).toLocaleString()
-                        : '—'}
-                    </span>
-                  </div>
-                  <div className="event-detail">
-                    <span className="detail-icon">📍</span>
-                    <span className="detail-text location-tbd">
-                      {event.locality || t('eventVenueHidden')}
-                    </span>
-                  </div>
-                  {event.price === 0 ? (
-                    <div className="event-detail">
-                      <span className="detail-icon">💰</span>
-                      <span className="detail-text">{t('eventFree')}</span>
-                    </div>
-                  ) : (
-                    <div className="event-detail">
-                      <span className="detail-icon">💰</span>
-                      <span className="detail-text">
-                        {event.price} {event.currency}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {event.description && (
-                  <p className="event-description">{event.description}</p>
-                )}
-
-                <div className="event-actions">
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setCurrentView('events')}
-                  >
-                    {t('eventBrowse')}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Upcoming RSVP'd Events */}
-      <div className="events-section">
-        <h3>{t('upcomingEvents')}</h3>
-
-        {eventsLoading ? (
-          <div className="loading-container" style={{ height: 'auto', padding: '2rem' }}>
-            <div className="loading-spinner"></div>
-          </div>
-        ) : upcomingEvents.length === 0 ? (
-          <div className="empty-state">
-            <p>{t('noRsvpdEvents')}</p>
-            <button
-              className="btn btn-primary"
-              onClick={() => setCurrentView('events')}
-            >
-              {t('eventBrowse')}
-            </button>
-          </div>
-        ) : (
-          <div className="events-grid">
-            {upcomingEvents.map(event => (
-              <div key={event.id} className="event-card booked">
-                <div className="event-header">
-                  <div className="event-title">
-                    <span className="event-emoji">
-                      {EVENT_TYPE_ICONS[event.type] || '🎉'}
-                    </span>
-                    <h4>{event.title}</h4>
-                  </div>
-                  <span className="booked-badge">✓ {t('bookingConfirmed')}</span>
-                </div>
-
-                <div className="event-details">
-                  <div className="event-detail">
-                    <span className="detail-icon">📅</span>
-                    <span className="detail-text">
-                      {event.dateTime
-                        ? new Date(event.dateTime).toLocaleString()
-                        : '—'}
-                    </span>
-                  </div>
-                  <div className="event-detail">
-                    <span className="detail-icon">📍</span>
-                    <span className="detail-text location-tbd">
-                      {event.locality || event.locationName || t('eventVenueHidden')}
-                    </span>
-                  </div>
-                  {event.price === 0 ? (
-                    <div className="event-detail">
-                      <span className="detail-icon">💰</span>
-                      <span className="detail-text">{t('eventFree')}</span>
-                    </div>
-                  ) : (
-                    <div className="event-detail">
-                      <span className="detail-icon">💰</span>
-                      <span className="detail-text">
-                        {event.price} {event.currency}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {event.description && (
-                  <p className="event-description">{event.description}</p>
-                )}
-
-                {/* Assigned venue reveal for booked users */}
-                {event.locationRevealed && event.venueGroups?.length > 0 && (() => {
-                  const uid = userProfile?.id;
-                  const assigned = event.venueGroups.find(g => Array.isArray(g.attendeeIds) && g.attendeeIds.includes(uid));
-                  if (!assigned) return null;
-                  return (
-                    <div className="assigned-venue-card assigned-venue-card--inline">
-                      <p className="assigned-venue-label">🎉 {t('yourVenue')}</p>
-                      <p className="venue-name">{assigned.name}</p>
-                      {assigned.address && <p className="venue-address">📍 {assigned.address}</p>}
-                      {assigned.mapsLink && (
-                        <a href={assigned.mapsLink} target="_blank" rel="noopener noreferrer"
-                          className="btn-secondary btn-sm venue-map-link">
-                          🗺️ {t('venueMapsLink')}
-                        </a>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      {children}
+    </View>
   );
 }
 
-export default Dashboard;
+export default function DashboardScreen({ onSignOut }) {
+  const { db, currentUser, userProfile, profileLoading } = useNativeApp();
+  const [events, setEvents] = useState([]);
+  const [bookings, setBookings] = useState([]);
+
+  useEffect(() => {
+    if (!db) return undefined;
+    const q = query(collection(db, 'events'), where('status', '==', 'published'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => {
+          const ad = a?.dateTime || '';
+          const bd = b?.dateTime || '';
+          return ad > bd ? 1 : -1;
+        });
+        setEvents(list);
+      },
+      () => setEvents([])
+    );
+
+    return unsub;
+  }, [db]);
+
+  useEffect(() => {
+    if (!db || !currentUser?.uid) return undefined;
+    const q = query(
+      collection(db, 'bookings'),
+      where('userId', '==', currentUser.uid),
+      where('status', '==', 'confirmed')
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setBookings(list);
+      },
+      () => setBookings([])
+    );
+
+    return unsub;
+  }, [db, currentUser?.uid]);
+
+  const bookedEventIds = useMemo(() => new Set(bookings.map((b) => b.eventId)), [bookings]);
+
+  const bookedUpcoming = useMemo(() => {
+    const now = new Date().toISOString();
+    return events.filter((ev) => bookedEventIds.has(ev.id) && ev.dateTime >= now);
+  }, [events, bookedEventIds]);
+
+  const localityEvents = useMemo(() => {
+    const now = new Date().toISOString();
+    const localityId = userProfile?.localityId || '';
+    const localityLabel = userProfile?.localityLabel || '';
+    return events.filter((ev) => {
+      if (!ev.dateTime || ev.dateTime < now) return false;
+      if (localityId && ev.localityId) return ev.localityId === localityId;
+      if (localityLabel) return ev.locality === localityLabel;
+      return true;
+    });
+  }, [events, userProfile?.localityId, userProfile?.localityLabel]);
+
+  const renderEventRow = ({ item }) => {
+    const when = item.dateTime ? new Date(item.dateTime).toLocaleString() : '-';
+    const price = Number(item.price || 0) === 0 ? 'Free' : `${item.price} ${item.currency || 'EGP'}`;
+    return (
+      <View style={styles.eventRow}>
+        <Text style={styles.eventTitle}>{item.title || 'Untitled event'}</Text>
+        <Text style={styles.eventMeta}>{when}</Text>
+        <Text style={styles.eventMeta}>{item.locality || '-'}</Text>
+        <Text style={styles.eventMeta}>{price}</Text>
+      </View>
+    );
+  };
+
+  if (profileLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#f97316" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.screen}>
+      <Text style={styles.title}>Dashboard</Text>
+
+      <SectionCard title="Profile">
+        <Text style={styles.infoLine}>Name: {userProfile?.displayName || userProfile?.name || currentUser?.displayName || '-'}</Text>
+        <Text style={styles.infoLine}>Email: {userProfile?.email || currentUser?.email || '-'}</Text>
+        <Text style={styles.infoLine}>City: {userProfile?.city || '-'}</Text>
+        <Text style={styles.infoLine}>Area: {userProfile?.localityLabel || '-'}</Text>
+      </SectionCard>
+
+      <SectionCard title="Quick Actions">
+        <Pressable style={styles.secondaryButton} onPress={onSignOut}>
+          <Text style={styles.secondaryButtonText}>Sign Out</Text>
+        </Pressable>
+      </SectionCard>
+
+      <SectionCard title={`Upcoming Booked (${bookedUpcoming.length})`}>
+        {bookedUpcoming.length === 0 ? (
+          <Text style={styles.emptyText}>No upcoming booked events.</Text>
+        ) : (
+          <FlatList
+            data={bookedUpcoming.slice(0, 4)}
+            keyExtractor={(item) => item.id}
+            renderItem={renderEventRow}
+            scrollEnabled={false}
+          />
+        )}
+      </SectionCard>
+
+      <SectionCard title={`Events In Your Area (${localityEvents.length})`}>
+        {localityEvents.length === 0 ? (
+          <Text style={styles.emptyText}>No upcoming events in your area.</Text>
+        ) : (
+          <FlatList
+            data={localityEvents.slice(0, 4)}
+            keyExtractor={(item) => item.id}
+            renderItem={renderEventRow}
+            scrollEnabled={false}
+          />
+        )}
+      </SectionCard>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fffaf5',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#9a3412',
+    marginBottom: 12,
+  },
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#9a3412',
+    marginBottom: 8,
+  },
+  infoLine: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#7c2d12',
+    marginBottom: 4,
+  },
+  primaryButton: {
+    backgroundColor: '#f97316',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 6,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff1e6',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 8,
+  },
+  secondaryButtonText: {
+    color: '#9a3412',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  eventRow: {
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: '#fff7ed',
+  },
+  eventTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7c2d12',
+    marginBottom: 4,
+  },
+  eventMeta: {
+    fontSize: 13,
+    color: '#9a3412',
+    marginBottom: 2,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9a3412',
+  },
+});

@@ -1,5 +1,7 @@
 {
+  "scheme": "com.gatherly.app",
   "ios": {
-    "bundleIdentifier": "com.gatherly.app"
+    "bundleIdentifier": "com.gatherly.app",
+    "googleServicesFile": "./GoogleService-Info.plist"
   }
 }

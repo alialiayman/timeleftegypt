@@ -1,104 +1,114 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  doc, updateDoc, collection, query, where,
-  onSnapshot, orderBy
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
+import { useNativeApp } from '../contexts/NativeAppContext';
 
-function AdminPanel({ onBack }) {
-  const { t } = useTranslation();
-  const { userProfile, users, isAdmin, isSuperAdmin } = useAuth();
+function UserRow({ user, busyId, onToggleBlock, onToggleAdmin }) {
+  const isBusy = busyId === user.id;
+  const role = user.role === 'super-admin' ? 'Master' : user.role === 'admin' || user.role === 'event_admin' ? 'Organizer' : 'Friend';
 
-  const [memberMsg, setMemberMsg] = useState('');
-  const [memberLoading, setMemberLoading] = useState(null);
+  return (
+    <View style={styles.rowCard}>
+      <Text style={styles.rowName}>{user.displayName || user.name || user.email || user.id}</Text>
+      {user.email ? <Text style={styles.rowMeta}>{user.email}</Text> : null}
+      {user.localityLabel ? <Text style={styles.rowMeta}>Area: {user.localityLabel}</Text> : null}
+      <Text style={styles.rowMeta}>Role: {role} | Status: {user.isBlocked ? 'Blocked' : 'Active'}</Text>
+
+      <View style={styles.rowActions}>
+        <Pressable style={styles.secondaryButton} disabled={isBusy} onPress={() => onToggleAdmin(user)}>
+          <Text style={styles.secondaryButtonText}>
+            {isBusy ? '...' : user.role === 'admin' || user.role === 'event_admin' ? 'Remove Organizer' : 'Make Organizer'}
+          </Text>
+        </Pressable>
+        <Pressable style={styles.dangerButton} disabled={isBusy} onPress={() => onToggleBlock(user)}>
+          <Text style={styles.dangerButtonText}>{isBusy ? '...' : user.isBlocked ? 'Unblock' : 'Block'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+export default function AdminPanelScreen() {
+  const { db, currentUser, userProfile } = useNativeApp();
+  const [members, setMembers] = useState([]);
   const [appeals, setAppeals] = useState([]);
-  const [appealLoading, setAppealLoading] = useState(null);
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('members');
+  const [busyId, setBusyId] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // The organizer's locality scope is assigned by the Master (organizerLocalityId)
-  const adminLocalityId = userProfile?.organizerLocalityId || userProfile?.localityId || '';
-  const adminLocalityLabel = userProfile?.organizerLocalityLabel || userProfile?.localityLabel || userProfile?.city || t('adminLocalityNotSet');
+  const localityId = userProfile?.organizerLocalityId || userProfile?.localityId || '';
 
-  // Load pending appeals
   useEffect(() => {
-    const q = query(
-      collection(db, 'appeals'),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
+    if (!db) return undefined;
+    const q = query(collection(db, 'users'), orderBy('displayName'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        let list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (localityId) list = list.filter((u) => u.localityId === localityId || u.organizerLocalityId === localityId);
+        list = list.filter((u) => u.id !== currentUser?.uid && u.role !== 'super-admin');
+        setMembers(list);
+        setLoading(false);
+      },
+      () => setLoading(false)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setAppeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {});
     return unsub;
-  }, []);
+  }, [db, localityId, currentUser?.uid]);
 
-  if (!isAdmin()) {
-    return (
-      <div className="admin-panel">
-        <div className="card access-denied">
-          <h2>⛔ {t('errorGeneral')}</h2>
-          <button className="btn btn-secondary" onClick={onBack}>{t('dashboard')}</button>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!db) return undefined;
+    const q = query(collection(db, 'appeals'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setAppeals(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [db]);
 
-  const showMemberMsg = (msg) => {
-    setMemberMsg(msg);
-    setTimeout(() => setMemberMsg(''), 3000);
-  };
+  const pendingMembers = useMemo(() => members.filter((u) => !u.role && !u.isBlocked), [members]);
+  const blockedMembers = useMemo(() => members.filter((u) => u.isBlocked), [members]);
 
-  // Scope members to this admin's locality (if set), else show all
-  const localityMembers = adminLocalityId
-    ? users.filter(u => u.localityId === adminLocalityId && u.role !== 'super-admin')
-    : users.filter(u => u.role !== 'super-admin');
-
-  const pendingMembers = localityMembers.filter(u => !u.isBlocked && !u.role);
-  const activeMembers = localityMembers.filter(u => !u.isBlocked);
-  const blockedMembers = localityMembers.filter(u => u.isBlocked);
-
-  const appealUsers = {};
-  users.forEach(u => { appealUsers[u.id] = u; });
-
-  const handleToggleBlock = async (user) => {
-    // Guard: organizer cannot block themselves
-    if (user.id === userProfile?.id) return;
-    setMemberLoading(user.id);
+  const toggleBlock = async (user) => {
+    setBusyId(user.id);
     try {
       await updateDoc(doc(db, 'users', user.id), {
         isBlocked: !user.isBlocked,
         lastUpdated: new Date().toISOString(),
       });
-      showMemberMsg(user.isBlocked ? t('memberUnblocked') : t('memberBlocked'));
-    } catch (err) {
-      console.error('Toggle block error:', err);
     } finally {
-      setMemberLoading(null);
+      setBusyId('');
     }
   };
 
-  const handleToggleAdmin = async (user) => {
-    // Guard: organizer cannot demote/remove themselves
-    if (user.id === userProfile?.id) return;
-    setMemberLoading(user.id);
+  const toggleAdmin = async (user) => {
+    setBusyId(user.id);
     try {
-      const newRole = (user.role === 'admin' || user.role === 'event_admin') ? '' : 'admin';
+      const nextRole = user.role === 'admin' || user.role === 'event_admin' ? '' : 'admin';
       await updateDoc(doc(db, 'users', user.id), {
-        role: newRole,
+        role: nextRole,
         lastUpdated: new Date().toISOString(),
       });
-      showMemberMsg(newRole === 'admin' ? t('memberPromoted') : t('memberDemoted'));
-    } catch (err) {
-      console.error('Toggle admin error:', err);
     } finally {
-      setMemberLoading(null);
+      setBusyId('');
     }
   };
 
-  const handleResolveAppeal = async (appeal, action) => {
-    setAppealLoading(appeal.id);
+  const resolveAppeal = async (appeal, action) => {
+    setBusyId(appeal.id);
     try {
       await updateDoc(doc(db, 'appeals', appeal.id), {
         status: action,
@@ -110,213 +120,96 @@ function AdminPanel({ onBack }) {
           lastUpdated: new Date().toISOString(),
         });
       }
-    } catch (err) {
-      console.error('Resolve appeal error:', err);
     } finally {
-      setAppealLoading(null);
+      setBusyId('');
     }
   };
 
-  const getRoleBadge = (user) => {
-    if (user.role === 'super-admin') return <span className="role-badge role-badge--super">{t('roleSuperAdmin')}</span>;
-    if (user.role === 'admin' || user.role === 'event_admin') return <span className="role-badge role-badge--admin">{t('roleAdmin')}</span>;
-    return <span className="role-badge role-badge--friend">{t('roleFriend')}</span>;
-  };
-
-  const getStatusBadge = (user) => {
-    if (user.isBlocked) return <span className="status-badge status-badge--blocked">{t('accountBlocked')}</span>;
-    return <span className="status-badge status-badge--active">{t('accountActive')}</span>;
-  };
-
-  const TABS = [
-    { key: 'pending', label: t('adminPendingApprovals'), count: pendingMembers.length },
-    { key: 'members', label: t('adminMembers'), count: activeMembers.length },
-    { key: 'blocked', label: t('adminBlockedMembers'), count: blockedMembers.length },
-    { key: 'appeals', label: t('adminAppeals'), count: appeals.length },
-  ];
-
-  const renderMemberRow = (user) => (
-    <div key={user.id} className="member-row">
-      <div className="member-info">
-        <div className="member-avatar">
-          {user.photoURL
-            ? <img src={user.photoURL} alt={user.displayName || user.name} className="member-photo" />
-            : <div className="avatar-placeholder avatar-placeholder--sm">{(user.displayName || user.name || '?')[0].toUpperCase()}</div>
-          }
-        </div>
-        <div className="member-details">
-          <p className="member-name">{user.displayName || user.name || '—'}</p>
-          {user.fullName && user.fullName !== (user.displayName || user.name) && (
-            <p className="member-fullname">{user.fullName}</p>
-          )}
-          <p className="member-email">{user.email || '—'}</p>
-          {user.phoneNumber && <p className="member-phone">📞 {user.phoneNumber}</p>}
-          {user.localityLabel && <p className="member-locality">📍 {user.localityLabel}</p>}
-        </div>
-        <div className="member-badges">
-          {getRoleBadge(user)}
-          {getStatusBadge(user)}
-        </div>
-      </div>
-      <div className="member-actions">
-        {!isSuperAdmin() && (user.role === 'super-admin') ? null : (
-          // Organizer cannot block or remove themselves
-          user.id === userProfile?.id ? (
-            <span className="self-badge">{t('you')}</span>
-          ) : (
-            <>
-              <button
-                className={`btn btn-sm ${user.role === 'admin' || user.role === 'event_admin' ? 'btn-secondary' : 'btn-primary'}`}
-                onClick={() => handleToggleAdmin(user)}
-                disabled={memberLoading === user.id}
-              >
-                {user.role === 'admin' || user.role === 'event_admin' ? t('removeAdmin') : t('promoteToAdmin')}
-              </button>
-              <button
-                className={`btn btn-sm ${user.isBlocked ? 'btn-secondary' : 'btn-danger'}`}
-                onClick={() => handleToggleBlock(user)}
-                disabled={memberLoading === user.id}
-              >
-                {user.isBlocked ? t('unblockMember') : t('blockMember')}
-              </button>
-            </>
-          )
-        )}
-      </div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#f97316" />
+      </View>
+    );
+  }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-panel-header">
-        <button className="btn btn-secondary" onClick={onBack}>← {t('dashboard')}</button>
-        <h2>⚙️ {t('adminPanel')}</h2>
-      </div>
+    <View style={styles.screen}>
+      <Text style={styles.title}>Organizer Panel</Text>
+      <Text style={styles.sub}>Locality scope: {userProfile?.organizerLocalityLabel || userProfile?.localityLabel || '-'}</Text>
 
-      {memberMsg && <div className="message-banner">{memberMsg}</div>}
+      <View style={styles.tabRow}>
+        <Pressable style={[styles.tab, activeTab === 'members' && styles.tabActive]} onPress={() => setActiveTab('members')}>
+          <Text style={[styles.tabText, activeTab === 'members' && styles.tabTextActive]}>Members ({members.length})</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'pending' && styles.tabActive]} onPress={() => setActiveTab('pending')}>
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.tabTextActive]}>Pending ({pendingMembers.length})</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'blocked' && styles.tabActive]} onPress={() => setActiveTab('blocked')}>
+          <Text style={[styles.tabText, activeTab === 'blocked' && styles.tabTextActive]}>Blocked ({blockedMembers.length})</Text>
+        </Pressable>
+        <Pressable style={[styles.tab, activeTab === 'appeals' && styles.tabActive]} onPress={() => setActiveTab('appeals')}>
+          <Text style={[styles.tabText, activeTab === 'appeals' && styles.tabTextActive]}>Appeals ({appeals.length})</Text>
+        </Pressable>
+      </View>
 
-      {/* Locality Summary */}
-      <div className="card locality-summary">
-        <div className="locality-summary-inner">
-          <span className="locality-icon">📍</span>
-          <div>
-            <p className="locality-summary-label">{t('adminLocalitySummary')}</p>
-            <p className="locality-summary-value">{adminLocalityLabel}</p>
-          </div>
-          <div className="locality-stats">
-            <span className="stat-pill">{localityMembers.length} {t('adminAllMembers')}</span>
-            {pendingMembers.length > 0 && (
-              <span className="stat-pill stat-pill--warning">{pendingMembers.length} {t('adminPendingApprovals')}</span>
-            )}
-            {blockedMembers.length > 0 && (
-              <span className="stat-pill stat-pill--danger">{blockedMembers.length} {t('adminBlockedMembers')}</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="admin-tabs">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            className={`admin-tab ${activeTab === tab.key ? 'admin-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-            {tab.count > 0 && <span className="tab-count">{tab.count}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Pending Approvals */}
-      {activeTab === 'pending' && (
-        <div className="card admin-section">
-          <h3>{t('adminPendingApprovals')}</h3>
-          {pendingMembers.length === 0 ? (
-            <p className="empty-state-inline">{t('adminNoPending')}</p>
-          ) : (
-            <div className="members-list">
-              {pendingMembers.map(renderMemberRow)}
-            </div>
+      {activeTab === 'appeals' ? (
+        <FlatList
+          data={appeals}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <View style={styles.rowCard}>
+              <Text style={styles.rowName}>User ID: {item.userId}</Text>
+              <Text style={styles.rowMeta}>{item.message || 'No message'}</Text>
+              <View style={styles.rowActions}>
+                <Pressable style={styles.primaryButton} disabled={busyId === item.id} onPress={() => resolveAppeal(item, 'approved')}>
+                  <Text style={styles.primaryButtonText}>{busyId === item.id ? '...' : 'Approve'}</Text>
+                </Pressable>
+                <Pressable style={styles.dangerButton} disabled={busyId === item.id} onPress={() => resolveAppeal(item, 'rejected')}>
+                  <Text style={styles.dangerButtonText}>{busyId === item.id ? '...' : 'Reject'}</Text>
+                </Pressable>
+              </View>
+            </View>
           )}
-        </div>
+          ListEmptyComponent={<Text style={styles.empty}>No pending appeals.</Text>}
+        />
+      ) : (
+        <FlatList
+          data={activeTab === 'pending' ? pendingMembers : activeTab === 'blocked' ? blockedMembers : members}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <UserRow user={item} busyId={busyId} onToggleBlock={toggleBlock} onToggleAdmin={toggleAdmin} />
+          )}
+          ListEmptyComponent={<Text style={styles.empty}>No members to show.</Text>}
+        />
       )}
 
-      {/* Active Members */}
-      {activeTab === 'members' && (
-        <div className="card admin-section">
-          <h3>{t('adminMembers')}</h3>
-          {activeMembers.length === 0 ? (
-            <p className="empty-state-inline">{t('adminNoMembers')}</p>
-          ) : (
-            <div className="members-list">
-              {activeMembers.map(renderMemberRow)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Blocked Members */}
-      {activeTab === 'blocked' && (
-        <div className="card admin-section">
-          <h3>{t('adminBlockedMembers')}</h3>
-          {blockedMembers.length === 0 ? (
-            <p className="empty-state-inline">{t('adminNoBlocked')}</p>
-          ) : (
-            <div className="members-list">
-              {blockedMembers.map(renderMemberRow)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Appeals */}
-      {activeTab === 'appeals' && (
-        <div className="card admin-section">
-          <h3>{t('adminAppeals')}</h3>
-          {appeals.length === 0 ? (
-            <p className="empty-state-inline">{t('noAppeals')}</p>
-          ) : (
-            <div className="appeals-list">
-              {appeals.map(appeal => {
-                const user = appealUsers[appeal.userId];
-                return (
-                  <div key={appeal.id} className="appeal-item card">
-                    <div className="appeal-header">
-                      <div className="appeal-user">
-                        <span className="appeal-user-name">{user?.displayName || user?.name || appeal.userId}</span>
-                        {user?.email && <span className="appeal-user-email">{user.email}</span>}
-                        {user && getStatusBadge(user)}
-                      </div>
-                      <span className="appeal-date">{appeal.createdAt ? new Date(appeal.createdAt).toLocaleDateString() : ''}</span>
-                    </div>
-                    <p className="appeal-message">{appeal.message}</p>
-                    <div className="appeal-actions">
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleResolveAppeal(appeal, 'approved')}
-                        disabled={appealLoading === appeal.id}
-                      >
-                        ✅ {t('approveAppeal')}
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleResolveAppeal(appeal, 'rejected')}
-                        disabled={appealLoading === appeal.id}
-                      >
-                        ❌ {t('rejectAppeal')}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </View>
   );
 }
 
-export default AdminPanel;
+const styles = StyleSheet.create({
+  screen: { flex: 1, paddingHorizontal: 16, paddingBottom: 14 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 26, fontWeight: '700', color: '#9a3412', marginBottom: 4 },
+  sub: { fontSize: 13, color: '#5b6e8a', marginBottom: 10 },
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  tab: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#fff' },
+  tabActive: { borderColor: '#f97316', backgroundColor: '#ffedd5' },
+  tabText: { color: '#7c2d12', fontWeight: '600', fontSize: 12 },
+  tabTextActive: { color: '#f97316' },
+  list: { paddingBottom: 8, gap: 10 },
+  rowCard: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 12, backgroundColor: '#fff', padding: 12 },
+  rowName: { fontSize: 15, fontWeight: '700', color: '#9a3412', marginBottom: 4 },
+  rowMeta: { fontSize: 13, color: '#3f5471', marginBottom: 3 },
+  rowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  primaryButton: { flex: 1, backgroundColor: '#f97316', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  secondaryButton: { flex: 1, backgroundColor: '#fff1e6', borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  secondaryButtonText: { color: '#9a3412', textAlign: 'center', fontWeight: '600', fontSize: 13 },
+  dangerButton: { flex: 1, backgroundColor: '#fbe9e8', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  dangerButtonText: { color: '#8f1f1a', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  empty: { color: '#9a3412', fontSize: 14, marginTop: 8 },
+});

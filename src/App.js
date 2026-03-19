@@ -11,7 +11,7 @@ import SuperAdminPanel from './components/SuperAdminPanel';
 import EventsScreen from './components/EventsScreen';
 
 function AppContent() {
-  const { currentUser, userProfile, loading, isAdmin, isSuperAdmin } = useAuth();
+  const { currentUser, userProfile, loading, isAdmin, isSuperAdmin, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const [currentView, setCurrentView] = useState('dashboard');
 
@@ -59,15 +59,15 @@ function AppContent() {
       case 'admin':
         return isAdmin() ?
           <AdminPanel onBack={() => setCurrentView('dashboard')} /> :
-          <Dashboard setCurrentView={setCurrentView} />;
+          <Dashboard setCurrentView={setCurrentView} onSignOut={logout} />;
       case 'superAdmin':
         return isSuperAdmin() ?
           <SuperAdminPanel onBack={() => setCurrentView('dashboard')} /> :
-          <Dashboard setCurrentView={setCurrentView} />;
+          <Dashboard setCurrentView={setCurrentView} onSignOut={logout} />;
       case 'events':
         return <EventsScreen setCurrentView={setCurrentView} />;
       default:
-        return <Dashboard setCurrentView={setCurrentView} />;
+        return <Dashboard setCurrentView={setCurrentView} onSignOut={logout} />;
     }
   };
 

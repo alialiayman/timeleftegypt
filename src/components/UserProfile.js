@@ -1,818 +1,633 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
-import { db, storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  collection, query, where, onSnapshot, addDoc, updateDoc, doc,
-  getDocs, orderBy, documentId
-} from 'firebase/firestore';
-import InterestsEditor from './InterestsEditor';
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { collection, getDocs } from 'firebase/firestore';
+import { useNativeApp } from '../contexts/NativeAppContext';
 
-function UserProfile({ onBack }) {
-  const { t } = useTranslation();
-  const { currentUser, userProfile, updateUserProfile, isAdmin } = useAuth();
+const DIETARY_OPTIONS = [
+  { key: '', label: 'No preference' },
+  { key: 'halal', label: 'Halal' },
+  { key: 'vegetarian', label: 'Vegetarian' },
+  { key: 'vegan', label: 'Vegan' },
+  { key: 'pescatarian', label: 'Pescatarian' },
+  { key: 'kosher', label: 'Kosher' },
+  { key: 'gluten_free', label: 'Gluten-free' },
+  { key: 'dairy_free', label: 'Dairy-free' },
+  { key: 'nut_allergy', label: 'Nut allergy' },
+  { key: 'other', label: 'Other' },
+];
 
-  const [formData, setFormData] = useState({
+const INTEREST_OPTIONS = [
+  { value: 'Coffee', icon: '☕' },
+  { value: 'Movies', icon: '🎬' },
+  { value: 'Paddle', icon: '🏓' },
+  { value: 'Dining', icon: '🍽️' },
+  { value: 'Books', icon: '📚' },
+  { value: 'Networking', icon: '🤝' },
+  { value: 'Fitness', icon: '💪' },
+  { value: 'Hiking', icon: '🥾' },
+  { value: 'Travel', icon: '✈️' },
+  { value: 'Art', icon: '🎨' },
+  { value: 'Music', icon: '🎵' },
+  { value: 'Gaming', icon: '🎮' },
+  { value: 'Tech', icon: '💻' },
+  { value: 'Photography', icon: '📷' },
+  { value: 'Volunteering', icon: '❤️' },
+  { value: 'Startups', icon: '🚀' },
+  { value: 'Language Exchange', icon: '🗣️' },
+  { value: 'Board Games', icon: '♟️' },
+];
+
+export default function UserProfileScreen() {
+  const { db, currentUser, userProfile, profileLoading, updateUserProfile } = useNativeApp();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [localities, setLocalities] = useState([]);
+  const [showLocalityModal, setShowLocalityModal] = useState(false);
+  const [localitySearch, setLocalitySearch] = useState('');
+  const [showDietaryModal, setShowDietaryModal] = useState(false);
+
+  const [form, setForm] = useState({
     displayName: '',
     fullName: '',
     phoneNumber: '',
+    city: '',
     gender: '',
     localityId: '',
-    preferences: {
-      dietary: '',
-      interests: [],
-      experience: '',
-    },
+    localityLabel: '',
+    dietary: '',
+    experience: '',
+    interests: [],
   });
 
-  const [loading, setLoading] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
-  const fileInputRef = useRef(null);
-
-  // Localities from Firestore
-  const [localities, setLocalities] = useState([]);
-
-  // Met people / ratings
-  const [metPeople, setMetPeople] = useState([]);
-  const [ratingsGiven, setRatingsGiven] = useState({});
-  const [ratingLoading, setRatingLoading] = useState(null);
-  const [ratingMessages, setRatingMessages] = useState({});
-
-  // Contact permissions (outgoing requests sent by current user)
-  const [contactRequests, setContactRequests] = useState({});
-  const [contactLoading, setContactLoading] = useState(null);
-
-  // Incoming connection requests (where current user is the target)
-  const [incomingRequests, setIncomingRequests] = useState([]);
-  const [incomingRequestors, setIncomingRequestors] = useState({});
-  const [incomingActionLoading, setIncomingActionLoading] = useState(null);
-
-  // Account status / appeals
-  const [appealText, setAppealText] = useState('');
-  const [appealStatus, setAppealStatus] = useState(null);
-  const [appealLoading, setAppealLoading] = useState(false);
-  const [showAppealForm, setShowAppealForm] = useState(false);
-
-  // Load localities
   useEffect(() => {
-    const q = query(collection(db, 'localities'), orderBy('country'));
-    const unsub = onSnapshot(q, (snap) => {
-      setLocalities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {});
-    return unsub;
-  }, []);
+    if (!db || !currentUser?.uid) return;
+    let active = true;
 
-  // Initialize form from profile
-  useEffect(() => {
-    if (userProfile) {
-      const rawInterests = userProfile.preferences?.interests;
-      const interestsArr = Array.isArray(rawInterests)
-        ? rawInterests
-        : typeof rawInterests === 'string' && rawInterests.trim()
-          ? rawInterests.split(',').map(s => s.trim()).filter(Boolean)
-          : [];
-
-      setFormData({
-        displayName: userProfile.displayName || '',
-        fullName: userProfile.fullName || '',
-        phoneNumber: userProfile.phoneNumber || '',
-        gender: userProfile.gender || '',
-        localityId: userProfile.localityId || '',
-        preferences: {
-          dietary: userProfile.preferences?.dietary || '',
-          interests: interestsArr,
-          experience: userProfile.preferences?.experience || '',
-        },
-      });
-    }
-  }, [userProfile]);
-
-  // Load met people: users who attended the same events as current user
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const loadMetPeople = async () => {
+    const loadData = async () => {
       try {
-        // Get all confirmed bookings for current user
-        const myBookingsSnap = await getDocs(
-          query(
-            collection(db, 'bookings'),
-            where('userId', '==', currentUser.uid),
-            where('status', '==', 'confirmed')
-          )
-        );
-        const myEventIds = myBookingsSnap.docs.map(d => d.data().eventId);
-        if (myEventIds.length === 0) return;
+        const localitySnap = await getDocs(collection(db, 'localities'));
 
-        // Get all bookings for those events (batched in groups of 10 for Firestore 'in' limit)
-        const metUserIds = new Set();
-        for (let i = 0; i < myEventIds.length; i += 10) {
-          const batch = myEventIds.slice(i, i + 10);
-          const othersSnap = await getDocs(
-            query(
-              collection(db, 'bookings'),
-              where('eventId', 'in', batch),
-              where('status', '==', 'confirmed')
-            )
-          );
-          othersSnap.docs.forEach(d => {
-            const uid = d.data().userId;
-            if (uid !== currentUser.uid) metUserIds.add(uid);
+        const localityList = localitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (active) setLocalities(localityList);
+
+        if (userProfile && active) {
+          const data = userProfile;
+          const interestsRaw = data.preferences?.interests;
+          const interests = Array.isArray(interestsRaw)
+            ? interestsRaw
+            : typeof interestsRaw === 'string'
+              ? interestsRaw.split(',').map((v) => v.trim()).filter(Boolean)
+              : [];
+
+          setForm({
+            displayName: data.displayName || currentUser.displayName || '',
+            fullName: data.fullName || '',
+            phoneNumber: data.phoneNumber || '',
+            city: data.city || '',
+            gender: data.gender || '',
+            localityId: data.localityId || '',
+            localityLabel: data.localityLabel || '',
+            dietary: data.preferences?.dietary || '',
+            experience: data.preferences?.experience || '',
+            interests,
           });
+        } else if (active) {
+          setForm((prev) => ({
+            ...prev,
+            displayName: currentUser.displayName || '',
+            city: prev.city || '',
+          }));
         }
-
-        if (metUserIds.size === 0) return;
-
-        // Load user profiles for met people
-        const metIds = Array.from(metUserIds);
-        const profilePromises = [];
-        for (let i = 0; i < metIds.length; i += 10) {
-          const batch = metIds.slice(i, i + 10);
-          profilePromises.push(
-            getDocs(query(collection(db, 'users'), where(documentId(), 'in', batch)))
-          );
-        }
-        const profileSnaps = await Promise.all(profilePromises);
-        const people = [];
-        profileSnaps.forEach(snap => {
-          snap.docs.forEach(d => people.push({ id: d.id, ...d.data() }));
-        });
-        setMetPeople(people);
-      } catch (err) {
-        console.error('Error loading met people:', err);
+      } catch (error) {
+        console.error('Load native profile failed:', error);
+      } finally {
+        if (active) setLoading(false);
       }
     };
 
-    loadMetPeople();
-  }, [currentUser]);
+    loadData();
 
-  // Load ratings given by current user
+    return () => {
+      active = false;
+    };
+  }, [db, currentUser?.uid, currentUser?.displayName, userProfile]);
+
   useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'ratings'),
-      where('fromUserId', '==', currentUser.uid)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const map = {};
-      snap.docs.forEach(d => {
-        const data = d.data();
-        map[data.toUserId] = { id: d.id, ...data };
-      });
-      setRatingsGiven(map);
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
+    if (!message) return;
+    const t = setTimeout(() => setMessage(''), 2800);
+    return () => clearTimeout(t);
+  }, [message]);
 
-  // Load contact permission requests sent by current user
-  useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'contactPermissions'),
-      where('requesterId', '==', currentUser.uid)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const map = {};
-      snap.docs.forEach(d => {
-        const data = d.data();
-        map[data.targetUserId] = { id: d.id, ...data };
-      });
-      setContactRequests(map);
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
+  const selectedLocality = useMemo(
+    () => localities.find((l) => l.id === form.localityId),
+    [localities, form.localityId]
+  );
 
-  // Load incoming connection requests where current user is the target
-  useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'contactPermissions'),
-      where('targetUserId', '==', currentUser.uid),
-      where('status', '==', 'pending')
-    );
-    const unsub = onSnapshot(q, async (snap) => {
-      const requests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setIncomingRequests(requests);
-      // Load requester profiles
-      const requesterIds = [...new Set(requests.map(r => r.requesterId))];
-      if (requesterIds.length === 0) { setIncomingRequestors({}); return; }
-      try {
-        const profiles = {};
-        for (let i = 0; i < requesterIds.length; i += 10) {
-          const batch = requesterIds.slice(i, i + 10);
-          const snap2 = await getDocs(
-            query(collection(db, 'users'), where(documentId(), 'in', batch))
-          );
-          snap2.docs.forEach(d => { profiles[d.id] = { id: d.id, ...d.data() }; });
-        }
-        setIncomingRequestors(profiles);
-      } catch (err) {
-        console.error('Error loading requestor profiles:', err);
-      }
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
+  const filteredLocalities = useMemo(() => {
+    const q = localitySearch.trim().toLowerCase();
+    if (!q) return localities.slice(0, 100);
+    return localities
+      .filter((loc) => {
+        const label = `${loc.country || ''} ${loc.city || ''} ${loc.area || ''}`.toLowerCase();
+        return label.includes(q);
+      })
+      .slice(0, 120);
+  }, [localities, localitySearch]);
 
-  // Load appeal status
-  useEffect(() => {
-    if (!currentUser) return;
-    const q = query(
-      collection(db, 'appeals'),
-      where('userId', '==', currentUser.uid)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const latest = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => (b.createdAt > a.createdAt ? -1 : 1))[0];
-        setAppealStatus(latest);
-      }
-    }, () => {});
-    return unsub;
-  }, [currentUser]);
+  const selectedDietaryLabel = useMemo(() => {
+    const found = DIETARY_OPTIONS.find((o) => o.key === form.dietary);
+    return found ? found.label : 'No preference';
+  }, [form.dietary]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if (name.startsWith('preferences.')) {
-      const prefKey = name.split('.')[1];
-      setFormData(prev => ({
+  const selectLocality = (loc) => {
+    const label = `${loc.country || ''} -> ${loc.city || ''} -> ${loc.area || ''}`;
+    setForm((prev) => ({
+      ...prev,
+      localityId: loc.id,
+      localityLabel: label,
+    }));
+    setShowLocalityModal(false);
+  };
+
+  const toggleInterest = (interest) => {
+    setForm((prev) => {
+      const has = prev.interests.includes(interest);
+      return {
         ...prev,
-        preferences: { ...prev.preferences, [prefKey]: value },
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
+        interests: has
+          ? prev.interests.filter((x) => x !== interest)
+          : [...prev.interests, interest],
+      };
+    });
   };
 
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert(t('errorGeneral'));
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t('errorGeneral'));
-      return;
-    }
-    try {
-      setUploadingPhoto(true);
-      const fileRef = ref(storage, `profile-photos/${userProfile.id}/${Date.now()}-${file.name}`);
-      const snapshot = await uploadBytes(fileRef, file);
-      const photoURL = await getDownloadURL(snapshot.ref);
-      await updateUserProfile({ photoURL });
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      alert(t('errorGeneral'));
-    } finally {
-      setUploadingPhoto(false);
-    }
+  const selectDietary = (value) => {
+    setForm((prev) => ({ ...prev, dietary: value }));
+    setShowDietaryModal(false);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
+  const saveProfile = async () => {
+    if (!db || !currentUser?.uid) return;
+    if (!form.displayName.trim()) {
+      setMessage('Display name is required.');
+      return;
+    }
 
-      // Resolve locality label
-      let localityLabel = '';
-      if (formData.localityId) {
-        const loc = localities.find(l => l.id === formData.localityId);
-        if (loc) localityLabel = `${loc.country} → ${loc.city} → ${loc.area}`;
-      }
+    setSaving(true);
+    try {
+      const interestsArr = form.interests;
 
       await updateUserProfile({
-        displayName: formData.displayName.trim(),
-        fullName: formData.fullName.trim(),
-        phoneNumber: formData.phoneNumber,
-        gender: formData.gender,
-        localityId: formData.localityId,
-        localityLabel,
+        displayName: form.displayName.trim(),
+        name: form.displayName.trim(),
+        fullName: form.fullName.trim(),
+        phoneNumber: form.phoneNumber.trim(),
+        city: form.city.trim(),
+        gender: form.gender,
+        localityId: form.localityId || '',
+        localityLabel: form.localityLabel || '',
         preferences: {
-          dietary: formData.preferences.dietary,
-          interests: formData.preferences.interests,
-          experience: formData.preferences.experience.trim(),
+          dietary: form.dietary,
+          experience: form.experience,
+          interests: interestsArr,
         },
       });
-      setSaveMessage(t('profileSaved'));
-      setTimeout(() => setSaveMessage(''), 3000);
+      setMessage('Profile saved.');
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert(t('errorGeneral'));
+      console.error('Save native profile failed:', error);
+      setMessage('Could not save profile.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSubmitRating = async (toUserId, starValue) => {
-    if (!currentUser) return;
-    setRatingLoading(toUserId);
-    try {
-      const existing = ratingsGiven[toUserId];
-      const ratingData = {
-        fromUserId: currentUser.uid,
-        toUserId,
-        numericRating: starValue,
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-      };
-      if (existing) {
-        await updateDoc(doc(db, 'ratings', existing.id), {
-          numericRating: starValue,
-          lastUpdated: new Date().toISOString(),
-        });
-      } else {
-        await addDoc(collection(db, 'ratings'), ratingData);
-      }
-      const person = metPeople.find(p => p.id === toUserId);
-      setRatingMessages(prev => ({
-        ...prev,
-        [toUserId]: t('ratingSubmittedFor', { name: person?.displayName || person?.name || toUserId }),
-      }));
-      setTimeout(() => {
-        setRatingMessages(prev => { const n = { ...prev }; delete n[toUserId]; return n; });
-      }, 3000);
-    } catch (err) {
-      console.error('Rating error:', err);
-    } finally {
-      setRatingLoading(null);
-    }
-  };
-
-  const handleConnectRequest = async (targetUserId) => {
-    if (!currentUser) return;
-    setContactLoading(targetUserId);
-    try {
-      await addDoc(collection(db, 'contactPermissions'), {
-        requesterId: currentUser.uid,
-        targetUserId,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        reviewedAt: null,
-      });
-    } catch (err) {
-      console.error('Connect request error:', err);
-    } finally {
-      setContactLoading(null);
-    }
-  };
-
-  const handleIncomingRequest = async (requestId, newStatus) => {
-    setIncomingActionLoading(requestId);
-    try {
-      await updateDoc(doc(db, 'contactPermissions', requestId), {
-        status: newStatus,
-        reviewedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('Error updating connection request:', err);
-    } finally {
-      setIncomingActionLoading(null);
-    }
-  };
-
-  const handleSubmitAppeal = async (e) => {
-    e.preventDefault();
-    if (!appealText.trim() || !currentUser) return;
-    try {
-      setAppealLoading(true);
-      await addDoc(collection(db, 'appeals'), {
-        userId: currentUser.uid,
-        message: appealText.trim(),
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        reviewedBy: null,
-        reviewedAt: null,
-      });
-      setAppealText('');
-      setShowAppealForm(false);
-    } catch (err) {
-      console.error('Appeal error:', err);
-    } finally {
-      setAppealLoading(false);
-    }
-  };
-
-  // Face-based rating options: index 0 = value 1 (very happy) ... index 4 = value 5 (very unhappy)
-  const faceRatings = [
-    { value: 1, emoji: '😍', desc: t('face1Desc') },
-    { value: 2, emoji: '😊', desc: t('face2Desc') },
-    { value: 3, emoji: '😐', desc: t('face3Desc') },
-    { value: 4, emoji: '😞', desc: t('face4Desc') },
-    { value: 5, emoji: '😢', desc: t('face5Desc') },
-  ];
+  if (loading || profileLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#f97316" />
+      </View>
+    );
+  }
 
   return (
-    <div className="user-profile">
-      <div className="profile-header">
-        <button className="back-btn" onClick={onBack}>
-          ← {t('dashboard')}
-        </button>
-        <h2>{t('editProfile')}</h2>
-      </div>
+    <ScrollView contentContainerStyle={styles.screen}>
+      <Text style={styles.title}>Profile</Text>
+      {message ? <Text style={styles.banner}>{message}</Text> : null}
 
-      <div className="profile-content">
-        {/* Photo Section */}
-        <div className="profile-photo-section">
-          <div className="current-photo">
-            {userProfile?.photoURL ? (
-              <img src={userProfile.photoURL} alt="Profile" className="profile-photo" />
-            ) : (
-              <div className="photo-placeholder">
-                {(userProfile?.displayName || userProfile?.name || 'U')[0].toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div className="photo-upload">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handlePhotoUpload}
-              accept="image/*"
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPhoto}
-            >
-              {uploadingPhoto ? '...' : '📷 ' + t('editProfile')}
-            </button>
-          </div>
-        </div>
+      <View style={styles.card}>
+        <Text style={styles.label}>Display Name</Text>
+        <TextInput
+          style={styles.input}
+          value={form.displayName}
+          onChangeText={(v) => setForm((p) => ({ ...p, displayName: v }))}
+          placeholder="Your display name"
+        />
 
-        {/* Profile Form */}
-        <form onSubmit={handleSubmit} className="profile-form">
-          {/* Basic Information */}
-          <div className="form-section">
-            <h3>📋 {t('displayName')}</h3>
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.readOnlyField}>
+          <Text style={styles.readOnlyText}>{currentUser?.email || userProfile?.email || '-'}</Text>
+        </View>
 
-            <div className="form-group">
-              <label htmlFor="displayName">{t('displayName')} *</label>
-              <input
-                type="text"
-                id="displayName"
-                name="displayName"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                required
-                maxLength={50}
-              />
-            </div>
+        <Text style={styles.label}>Full Name</Text>
+        <TextInput
+          style={styles.input}
+          value={form.fullName}
+          onChangeText={(v) => setForm((p) => ({ ...p, fullName: v }))}
+          placeholder="Your full name"
+        />
 
-            <div className="form-group">
-              <label htmlFor="fullName">{t('fullName')}</label>
-              <input
-                type="text"
-                id="fullName"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleInputChange}
-                maxLength={100}
-              />
-            </div>
+        <Text style={styles.label}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={form.phoneNumber}
+          onChangeText={(v) => setForm((p) => ({ ...p, phoneNumber: v }))}
+          placeholder="+20 ..."
+          keyboardType="phone-pad"
+        />
 
-            <div className="form-group">
-              <label htmlFor="phoneNumber">{t('phone')}</label>
-              <input
-                type="tel"
-                id="phoneNumber"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                maxLength={20}
-                placeholder="+20 123 456 7890"
-              />
-            </div>
+        <Text style={styles.label}>City</Text>
+        <TextInput
+          style={styles.input}
+          value={form.city}
+          onChangeText={(v) => setForm((p) => ({ ...p, city: v }))}
+          placeholder="Cairo"
+        />
 
-            <div className="form-group">
-              <label htmlFor="gender">{t('gender')}</label>
-              <select
-                id="gender"
-                name="gender"
-                value={formData.gender}
-                onChange={handleInputChange}
+        <Text style={styles.label}>Gender</Text>
+        <View style={styles.genderRow}>
+          <Pressable
+            style={[styles.choiceButton, form.gender === 'male' && styles.choiceButtonActive]}
+            onPress={() => setForm((p) => ({ ...p, gender: 'male' }))}
+          >
+            <Text style={[styles.choiceText, form.gender === 'male' && styles.choiceTextActive]}>Male</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.choiceButton, form.gender === 'female' && styles.choiceButtonActive]}
+            onPress={() => setForm((p) => ({ ...p, gender: 'female' }))}
+          >
+            <Text style={[styles.choiceText, form.gender === 'female' && styles.choiceTextActive]}>Female</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Locality</Text>
+        <Text style={styles.helperText}>Search and select your locality.</Text>
+        <Pressable style={styles.selectorField} onPress={() => setShowLocalityModal(true)}>
+          <Text style={styles.selectorText}>
+            {selectedLocality ? `${selectedLocality.country} -> ${selectedLocality.city} -> ${selectedLocality.area}` : 'Choose locality'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Preferences</Text>
+
+        <Text style={styles.label}>Dietary</Text>
+        <Pressable style={styles.selectorField} onPress={() => setShowDietaryModal(true)}>
+          <Text style={styles.selectorText}>{selectedDietaryLabel}</Text>
+        </Pressable>
+
+        <Text style={styles.label}>Interests</Text>
+        <Text style={styles.helperText}>Pick as many as you like. Your interests can span multiple lines.</Text>
+        <View style={styles.chipsWrap}>
+          {INTEREST_OPTIONS.map((interest) => {
+            const active = form.interests.includes(interest.value);
+            return (
+              <Pressable
+                key={interest.value}
+                style={[styles.interestCard, active && styles.interestCardActive]}
+                onPress={() => toggleInterest(interest.value)}
               >
-                <option value="">—</option>
-                <option value="male">Male / ذكر</option>
-                <option value="female">Female / أنثى</option>
-              </select>
-            </div>
-          </div>
+                <Text style={styles.interestIcon}>{interest.icon}</Text>
+                <Text style={[styles.interestText, active && styles.interestTextActive]}>{interest.value}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-          {/* Locality */}
-          <div className="form-section">
-            <h3>📍 {t('locality')}</h3>
-            {/* Show organizer-assigned locality as read-only for admins/organizers */}
-            {isAdmin() && userProfile?.organizerLocalityId && (
-              <div className="form-group">
-                <label>{t('roleAdmin')} {t('locality')}</label>
-                <p className="organizer-locality-readonly">
-                  🏢 {userProfile.organizerLocalityLabel || userProfile.organizerLocalityId}
-                </p>
-                <small className="field-note">
-                  {t('organizerLocalityNote')}
-                </small>
-              </div>
-            )}
-            <div className="form-group">
-              <label htmlFor="localityId">{t('localitySelect')}</label>
-              <select
-                id="localityId"
-                name="localityId"
-                value={formData.localityId}
-                onChange={handleInputChange}
-              >
-                <option value="">— {t('localitySelect')} —</option>
-                {localities.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.country} → {loc.city} → {loc.area}
-                  </option>
-                ))}
-              </select>
-              {isAdmin() && (
-                <small className="field-note">
-                  {t('attendanceLocalityNote')}
-                </small>
-              )}
-            </div>
-          </div>
+        <Text style={styles.label}>Experience</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          value={form.experience}
+          onChangeText={(v) => setForm((p) => ({ ...p, experience: v }))}
+          placeholder="Tell us about your background"
+          multiline
+        />
+      </View>
 
-          {/* Preferences & Interests */}
-          <div className="form-section">
-            <h3>❤️ {t('interests')}</h3>
+      <Pressable style={[styles.primaryButton, saving && styles.disabled]} onPress={saveProfile} disabled={saving}>
+        <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
+      </Pressable>
 
-            <div className="form-group">
-              <label>{t('dietary')}</label>
-              <select
-                id="preferences.dietary"
-                name="preferences.dietary"
-                value={formData.preferences.dietary}
-                onChange={handleInputChange}
-              >
-                <option value="">No specific preference</option>
-                <option value="vegetarian">Vegetarian</option>
-                <option value="vegan">Vegan</option>
-                <option value="pescatarian">Pescatarian</option>
-                <option value="halal">Halal</option>
-                <option value="kosher">Kosher</option>
-                <option value="gluten-free">Gluten-free</option>
-                <option value="dairy-free">Dairy-free</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
+      <Modal visible={showLocalityModal} animationType="slide" onRequestClose={() => setShowLocalityModal(false)}>
+        <View style={styles.modalScreen}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Locality</Text>
+            <Pressable onPress={() => setShowLocalityModal(false)}>
+              <Text style={styles.modalClose}>Close</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            style={styles.input}
+            value={localitySearch}
+            onChangeText={setLocalitySearch}
+            placeholder="Search country, city, or area"
+          />
+          <FlatList
+            data={filteredLocalities}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => {
+              const label = `${item.country || ''} -> ${item.city || ''} -> ${item.area || ''}`;
+              const active = form.localityId === item.id;
+              return (
+                <Pressable style={[styles.listRow, active && styles.listRowActive]} onPress={() => selectLocality(item)}>
+                  <Text style={[styles.listRowText, active && styles.listRowTextActive]}>{label}</Text>
+                </Pressable>
+              );
+            }}
+            contentContainerStyle={styles.modalListContent}
+            ListEmptyComponent={<Text style={styles.emptyText}>No locality matches your search.</Text>}
+          />
+        </View>
+      </Modal>
 
-            <div className="form-group">
-              <label>{t('interests')}</label>
-              <InterestsEditor
-                interests={formData.preferences.interests}
-                onChange={(updated) => setFormData(prev => ({
-                  ...prev,
-                  preferences: { ...prev.preferences, interests: updated },
-                }))}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="preferences.experience">{t('experience')}</label>
-              <small className="field-note">{t('experienceNote')}</small>
-              <textarea
-                id="preferences.experience"
-                name="preferences.experience"
-                value={formData.preferences.experience}
-                onChange={handleInputChange}
-                rows={3}
-                maxLength={500}
-                placeholder="e.g. Software engineer, doctor, educator..."
-              />
-            </div>
-          </div>
-
-          {saveMessage && <p className="save-success-msg">{saveMessage}</p>}
-
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={onBack}>
-              {t('cancelForm')}
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? '...' : t('saveProfile')}
-            </button>
-          </div>
-        </form>
-
-        {/* Incoming Connection Requests — visible to the destination user */}
-        {incomingRequests.length > 0 && (
-          <div className="incoming-requests-section">
-            <h3>🔔 {t('pendingConnectionRequests')}</h3>
-            <div className="incoming-requests-list">
-              {incomingRequests.map(req => {
-                const requester = incomingRequestors[req.requesterId];
-                const name = requester?.displayName || requester?.name || req.requesterId;
-                return (
-                  <div key={req.id} className="incoming-request-item">
-                    <div className="person-info">
-                      <div className="person-avatar">
-                        {requester?.photoURL
-                          ? <img src={requester.photoURL} alt="" />
-                          : (name || '?')[0].toUpperCase()
-                        }
-                      </div>
-                      <div className="person-details">
-                        <strong>{name}</strong>
-                        {requester?.localityLabel && <small>📍 {requester.localityLabel}</small>}
-                        <p className="request-msg">{t('connectionRequestFrom', { name })}</p>
-                      </div>
-                    </div>
-                    <div className="request-actions">
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleIncomingRequest(req.id, 'approved')}
-                        disabled={incomingActionLoading === req.id}
-                      >
-                        ✅ {t('acceptRequest')}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleIncomingRequest(req.id, 'rejected')}
-                        disabled={incomingActionLoading === req.id}
-                      >
-                        ✕ {t('rejectRequest')}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Met People & Ratings */}
-        <div className="met-people-section">
-          <h3>🤝 {t('metPeople')}</h3>
-          {metPeople.length === 0 ? (
-            <p className="empty-state-text">{t('metPeopleEmpty')}</p>
-          ) : (
-            <div className="met-people-list">
-              {metPeople.map(person => {
-                const existingRating = ratingsGiven[person.id];
-                const contactReq = contactRequests[person.id];
-                const isApproved = contactReq?.status === 'approved';
-
-                return (
-                  <div key={person.id} className="met-person-card">
-                    <div className="person-info">
-                      <div className="person-avatar">
-                        {person.photoURL
-                          ? <img src={person.photoURL} alt="" />
-                          : (person.displayName || person.name || '?')[0].toUpperCase()
-                        }
-                      </div>
-                      <div className="person-details">
-                        <strong>{person.displayName || person.name}</strong>
-                        {person.localityLabel && (
-                          <small>📍 {person.localityLabel}</small>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Face-based Rating */}
-                    <div className="face-rating-row">
-                      <span className="rating-label">{t('ratePerson')}:</span>
-                      <div className="face-rating-buttons">
-                        {faceRatings.map(({ value, emoji, desc }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            className={`face-btn ${existingRating?.numericRating === value ? 'face-selected' : ''}`}
-                            onClick={() => handleSubmitRating(person.id, value)}
-                            disabled={ratingLoading === person.id}
-                            title={desc}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                      {ratingMessages[person.id] && (
-                        <span className="rating-saved-msg">{ratingMessages[person.id]}</span>
-                      )}
-                    </div>
-
-                    {/* Connect Request */}
-                    <div className="connect-row">
-                      {contactReq ? (
-                        <div className="connect-status-block">
-                          <span className={`connect-status connect-${contactReq.status}`}>
-                            {isApproved
-                              ? '✅ ' + t('connectRequestApproved')
-                              : contactReq.status === 'rejected'
-                                ? '✗ ' + t('connectRequestRejected')
-                                : '⏳ ' + t('connectRequestPending')}
-                          </span>
-                          {/* Show phone number when connection is approved */}
-                          {isApproved && person.phoneNumber && (
-                            <div className="phone-reveal">
-                              <span className="phone-number">
-                                📞 {t('phoneNumber')}: <strong>{person.phoneNumber}</strong>
-                              </span>
-                              <a
-                                href={`https://wa.me/${person.phoneNumber.replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-primary btn-sm whatsapp-btn"
-                              >
-                                💬 {t('callOrWhatsApp')}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleConnectRequest(person.id)}
-                          disabled={contactLoading === person.id}
-                        >
-                          🤝 {t('connectRequest')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Account Information */}
-        <div className="account-info">
-          <h3>🔐 {t('accountInfo')}</h3>
-          <div className="info-grid">
-            <div className="info-item">
-              <strong>{t('displayName')}:</strong>{' '}
-              {userProfile?.displayName || '—'}
-            </div>
-            <div className="info-item">
-              <strong>Email:</strong> {userProfile?.email || '—'}
-            </div>
-            <div className="info-item">
-              <strong>{t('accountStatus')}:</strong>{' '}
-              {userProfile?.isBlocked ? (
-                <span className="status-blocked">{t('accountBlocked')}</span>
-              ) : (
-                <span className="status-active">{t('accountActive')}</span>
-              )}
-            </div>
-            <div className="info-item">
-              <strong>Member Since:</strong>{' '}
-              {userProfile?.createdAt
-                ? new Date(userProfile.createdAt).toLocaleDateString()
-                : '—'}
-            </div>
-          </div>
-
-          {/* Blocked: show appeal option */}
-          {userProfile?.isBlocked && (
-            <div className="blocked-notice">
-              <p>{t('accountBlockedNote')}</p>
-              {appealStatus?.status === 'pending' ? (
-                <p className="appeal-pending-msg">⏳ {t('appealPending')}</p>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className="btn-primary btn-sm"
-                    onClick={() => setShowAppealForm(v => !v)}
-                  >
-                    📝 {t('appealButton')}
-                  </button>
-                  {showAppealForm && (
-                    <form onSubmit={handleSubmitAppeal} className="appeal-form">
-                      <textarea
-                        value={appealText}
-                        onChange={e => setAppealText(e.target.value)}
-                        rows={3}
-                        placeholder={t('appealPlaceholder')}
-                        maxLength={1000}
-                        required
-                      />
-                      <button type="submit" className="btn-primary" disabled={appealLoading}>
-                        {appealLoading ? '...' : t('appealSubmit')}
-                      </button>
-                    </form>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      <Modal visible={showDietaryModal} animationType="slide" onRequestClose={() => setShowDietaryModal(false)}>
+        <View style={styles.modalScreen}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Dietary Preference</Text>
+            <Pressable onPress={() => setShowDietaryModal(false)}>
+              <Text style={styles.modalClose}>Close</Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={DIETARY_OPTIONS}
+            keyExtractor={(item) => item.key || 'none'}
+            renderItem={({ item }) => {
+              const active = form.dietary === item.key;
+              return (
+                <Pressable style={[styles.listRow, active && styles.listRowActive]} onPress={() => selectDietary(item.key)}>
+                  <Text style={[styles.listRowText, active && styles.listRowTextActive]}>{item.label}</Text>
+                </Pressable>
+              );
+            }}
+            contentContainerStyle={styles.modalListContent}
+          />
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 
-export default UserProfile;
+const styles = StyleSheet.create({
+  screen: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#9a3412',
+    marginBottom: 10,
+  },
+  banner: {
+    backgroundColor: '#e7f2ff',
+    borderWidth: 1,
+    borderColor: '#c7dcf8',
+    color: '#1f4b8f',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#9a3412',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    color: '#7c2d12',
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#9a3412',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 15,
+    color: '#9a3412',
+    backgroundColor: '#ffffff',
+  },
+  readOnlyField: {
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#fff7ed',
+  },
+  readOnlyText: {
+    color: '#9a3412',
+    fontSize: 14,
+  },
+  selectorField: {
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  selectorText: {
+    color: '#9a3412',
+    fontSize: 14,
+  },
+  textarea: {
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  interestCard: {
+    width: '48%',
+    minHeight: 88,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fffaf5',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    boxShadow: '0px 6px 16px rgba(249, 115, 22, 0.08)',
+  },
+  interestCardActive: {
+    borderColor: '#f97316',
+    backgroundColor: '#ffedd5',
+  },
+  interestIcon: {
+    fontSize: 22,
+    marginBottom: 8,
+  },
+  interestText: {
+    color: '#7c2d12',
+    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  interestTextActive: {
+    color: '#c2410c',
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 2,
+  },
+  choiceButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+  },
+  choiceButtonActive: {
+    borderColor: '#f97316',
+    backgroundColor: '#ffedd5',
+  },
+  choiceText: {
+    textAlign: 'center',
+    color: '#7c2d12',
+    fontWeight: '600',
+  },
+  choiceTextActive: {
+    color: '#f97316',
+  },
+  modalScreen: {
+    flex: 1,
+    backgroundColor: '#fffaf5',
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#9a3412',
+  },
+  modalClose: {
+    color: '#ea580c',
+    fontWeight: '700',
+  },
+  modalListContent: {
+    paddingTop: 12,
+    paddingBottom: 30,
+  },
+  listRow: {
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  listRowActive: {
+    borderColor: '#f97316',
+    backgroundColor: '#ffedd5',
+  },
+  listRowText: {
+    color: '#7c2d12',
+    fontWeight: '600',
+  },
+  listRowTextActive: {
+    color: '#f97316',
+  },
+  emptyText: {
+    color: '#7c2d12',
+    fontSize: 14,
+    paddingTop: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#f97316',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff1e6',
+    borderWidth: 1,
+    borderColor: '#fdba74',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  secondaryButtonText: {
+    color: '#9a3412',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  ghostButton: {
+    paddingVertical: 8,
+  },
+  ghostButtonText: {
+    textAlign: 'center',
+    color: '#1f56bd',
+    fontWeight: '600',
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+});

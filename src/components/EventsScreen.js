@@ -85,7 +85,40 @@ function EventCard({
 
   return (
     <View style={styles.eventCard}>
-      <Text style={styles.eventTitle}>{event.title || 'Untitled event'}</Text>
+      <View style={styles.eventHeaderRow}>
+        <View style={styles.eventTitleWrapper}>
+          <Text style={styles.eventTitle}>{event.title || 'Untitled event'}</Text>
+          {event.creatorName && (
+            <Text style={styles.creatorLabel}>Created by {event.creatorName}</Text>
+          )}
+        </View>
+        {isCreator && (
+          <View style={styles.creatorActionIcons}>
+            <Pressable
+              style={[styles.iconButton, styles.iconButtonTeal]}
+              onPress={() => onRunAlgorithm(event)}
+              disabled={busy}
+            >
+              <Text style={styles.iconButtonText}>⚙️</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.iconButton, styles.iconButtonGreen]}
+              onPress={() => onEdit(event)}
+              disabled={busy}
+            >
+              <Text style={styles.iconButtonText}>✏️</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.iconButton, styles.iconButtonRed]}
+              onPress={() => onDelete(event)}
+              disabled={busy}
+            >
+              <Text style={styles.iconButtonText}>🗑️</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+
       <Text style={styles.eventMeta}>Type: {event.type}</Text>
       <Text style={styles.eventMeta}>Date: {eventDate}</Text>
       <Text style={styles.eventMeta}>Locality: {event.locality || '-'}</Text>
@@ -94,26 +127,16 @@ function EventCard({
       <Text style={styles.eventMeta}>Price: {priceLabel}</Text>
       {event.description ? <Text style={styles.eventDescription}>{event.description}</Text> : null}
 
-      {isCreator ? (
-        <View>
-          <Pressable style={styles.primaryButton} onPress={() => onRunAlgorithm(event)} disabled={busy}>
-            <Text style={styles.primaryButtonText}>{busy ? '...' : 'Run Match Algorithm'}</Text>
+      {!isCreator && (
+        isBooked ? (
+          <Pressable style={styles.secondaryButton} onPress={() => onCancel(event)} disabled={busy}>
+            <Text style={styles.secondaryButtonText}>{busy ? '...' : 'Cancel Booking'}</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => onEdit(event)} disabled={busy}>
-            <Text style={styles.secondaryButtonText}>{busy ? '...' : 'Edit Event'}</Text>
+        ) : (
+          <Pressable style={styles.primaryButton} onPress={() => onBook(event)} disabled={busy}>
+            <Text style={styles.primaryButtonText}>{busy ? '...' : 'Book Event'}</Text>
           </Pressable>
-          <Pressable style={[styles.secondaryButton, styles.deleteButton]} onPress={() => onDelete(event)} disabled={busy}>
-            <Text style={[styles.secondaryButtonText, styles.deleteButtonText]}>{busy ? '...' : 'Delete Event'}</Text>
-          </Pressable>
-        </View>
-      ) : isBooked ? (
-        <Pressable style={styles.secondaryButton} onPress={() => onCancel(event)} disabled={busy}>
-          <Text style={styles.secondaryButtonText}>{busy ? '...' : 'Cancel Booking'}</Text>
-        </Pressable>
-      ) : (
-        <Pressable style={styles.primaryButton} onPress={() => onBook(event)} disabled={busy}>
-          <Text style={styles.primaryButtonText}>{busy ? '...' : 'Book Event'}</Text>
-        </Pressable>
+        )
       )}
     </View>
   );
@@ -273,6 +296,7 @@ export default function EventsScreen() {
         attendeeIds: [],
         status: 'published',
         createdBy: currentUser.uid,
+        creatorName: currentUser.displayName || currentUser.email || 'Anonymous',
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       };
@@ -840,11 +864,53 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
   },
+  eventHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    gap: 10,
+  },
+  eventTitleWrapper: {
+    flex: 1,
+  },
   eventTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  creatorLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  creatorActionIcons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  iconButtonGreen: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#2EDC9A',
+  },
+  iconButtonTeal: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#17BEBB',
+  },
+  iconButtonRed: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#DC2626',
+  },
+  iconButtonText: {
+    fontSize: 18,
   },
   eventMeta: {
     fontSize: 14,

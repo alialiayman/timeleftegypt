@@ -22,3 +22,16 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# iOS native project files required for CI/Xcode Cloud
+!ios/
+!ios/*.xcodeproj/
+!ios/*.xcodeproj/**
+!ios/*.xcworkspace/
+!ios/*.xcworkspace/**
+!ios/Podfile
+
+# iOS local/build artifacts
+ios/build/
+ios/**/DerivedData/
+ios/Pods/

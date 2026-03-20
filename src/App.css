@@ -4187,6 +4187,98 @@ body {
   color: rgba(255,255,255,.45);
 }
 
+/* ── Legal pages ── */
+.legal-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 350px at 15% -5%, rgba(251,191,36,.28), transparent 60%),
+    radial-gradient(900px 320px at 100% 0%, rgba(249,115,22,.2), transparent 62%),
+    var(--g-bg);
+  color: var(--g-text);
+}
+
+.legal-page__container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 20px 56px;
+}
+
+.legal-page__back {
+  display: inline-block;
+  margin-bottom: 22px;
+  color: var(--g-primary-dark);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.legal-page__back:hover {
+  text-decoration: underline;
+}
+
+.legal-page__header {
+  background: rgba(255,255,255,.78);
+  border: 1px solid var(--g-border-light);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--g-shadow-sm);
+  margin-bottom: 18px;
+}
+
+.legal-page__header h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.12;
+}
+
+.legal-page__date {
+  margin: 10px 0 0;
+  color: var(--g-text-muted);
+  font-size: 14px;
+}
+
+.legal-page__intro {
+  margin: 14px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.legal-page__content {
+  display: grid;
+  gap: 12px;
+}
+
+.legal-page__section {
+  background: var(--g-surface-2);
+  border: 1px solid var(--g-border-light);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.legal-page__section h2 {
+  margin: 0 0 10px;
+  font-size: 21px;
+}
+
+.legal-page__section ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.legal-page__section li {
+  line-height: 1.7;
+}
+
+.legal-page--rtl {
+  direction: rtl;
+}
+
+.legal-page--rtl .legal-page__section ul {
+  padding-left: 0;
+  padding-right: 18px;
+}
+
 /* ============================================================
    RESPONSIVE  — landing page
    ============================================================ */
@@ -4255,6 +4347,14 @@ body {
 
   .lp-features__grid {
     grid-template-columns: 1fr;
+  }
+
+  .legal-page__header h1 {
+    font-size: 28px;
+  }
+
+  .legal-page__container {
+    padding: 24px 14px 40px;
   }
 }
 

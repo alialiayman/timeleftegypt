@@ -430,6 +430,8 @@ function LandingPage() {
             <a href="#lp-about" className="lp-footer__link">{t('navAbout')}</a>
             <a href="#lp-features" className="lp-footer__link">{t('navFeatures')}</a>
             <a href="#lp-pricing" className="lp-footer__link">{t('navPricing')}</a>
+            <a href="/privacy-policy" className="lp-footer__link">{t('footerPrivacyPolicy')}</a>
+            <a href="/terms-of-service" className="lp-footer__link">{t('footerTerms')}</a>
           </div>
 
           <div className="lp-footer__col">

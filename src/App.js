@@ -1,19 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import './i18n';
 import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LandingPage from './components/LandingPage';
+import LegalPage from './components/LegalPage';
 import Dashboard from './components/Dashboard';
 import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import EventsScreen from './components/EventsScreen';
 
+const getLegalTypeFromPath = (pathname) => {
+  const normalized = pathname.replace(/\/+$/, '') || '/';
+  if (normalized === '/privacy-policy' || normalized === '/privacy') return 'privacy';
+  if (normalized === '/terms-of-service' || normalized === '/terms') return 'terms';
+  return null;
+};
+
 function AppContent() {
   const { currentUser, userProfile, loading, isAdmin, isSuperAdmin, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const [currentView, setCurrentView] = useState('dashboard');
+  const [legalType, setLegalType] = useState(() => getLegalTypeFromPath(window.location.pathname));
+
+  useEffect(() => {
+    const onNavigation = () => setLegalType(getLegalTypeFromPath(window.location.pathname));
+    window.addEventListener('popstate', onNavigation);
+    return () => window.removeEventListener('popstate', onNavigation);
+  }, []);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'ar' : 'en';
@@ -37,6 +52,10 @@ function AppContent() {
         <p>{t('loading')}</p>
       </div>
     );
+  }
+
+  if (legalType) {
+    return <LegalPage type={legalType} />;
   }
 
   if (!currentUser) {

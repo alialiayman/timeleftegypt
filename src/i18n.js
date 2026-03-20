@@ -400,6 +400,8 @@ const resources = {
       footerContact: 'Contact Us',
       footerWhatsApp: 'WhatsApp',
       footerLinks: 'Quick Links',
+      footerPrivacyPolicy: 'Privacy Policy',
+      footerTerms: 'Terms of Service',
       footerCopyright: '© 2025 Gatherly. All rights reserved.',
     }
   },
@@ -800,6 +802,8 @@ const resources = {
       footerContact: 'تواصل معنا',
       footerWhatsApp: 'واتساب',
       footerLinks: 'روابط سريعة',
+      footerPrivacyPolicy: 'سياسة الخصوصية',
+      footerTerms: 'شروط الاستخدام',
       footerCopyright: '© 2025 غاذرلي. جميع الحقوق محفوظة.',
     }
   }

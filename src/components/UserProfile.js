@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNativeApp } from '../contexts/NativeAppContext';
 
@@ -27,25 +29,128 @@ const DIETARY_OPTIONS = [
 ];
 
 const INTEREST_OPTIONS = [
-  { value: 'Coffee', icon: '☕' },
-  { value: 'Movies', icon: '🎬' },
-  { value: 'Paddle', icon: '🏓' },
-  { value: 'Dining', icon: '🍽️' },
-  { value: 'Books', icon: '📚' },
-  { value: 'Networking', icon: '🤝' },
-  { value: 'Fitness', icon: '💪' },
-  { value: 'Hiking', icon: '🥾' },
-  { value: 'Travel', icon: '✈️' },
-  { value: 'Art', icon: '🎨' },
-  { value: 'Music', icon: '🎵' },
-  { value: 'Gaming', icon: '🎮' },
-  { value: 'Tech', icon: '💻' },
-  { value: 'Photography', icon: '📷' },
-  { value: 'Volunteering', icon: '❤️' },
-  { value: 'Startups', icon: '🚀' },
-  { value: 'Language Exchange', icon: '🗣️' },
-  { value: 'Board Games', icon: '♟️' },
+  { value: 'Coffee', icon: 'coffee' },
+  { value: 'Movies', icon: 'movie-open' },
+  { value: 'Paddle', icon: 'table-tennis' },
+  { value: 'Dining', icon: 'silverware-fork-knife' },
+  { value: 'Books', icon: 'book-open-variant' },
+  { value: 'Networking', icon: 'account-group' },
+  { value: 'Fitness', icon: 'dumbbell' },
+  { value: 'Hiking', icon: 'hiking' },
+  { value: 'Travel', icon: 'airplane' },
+  { value: 'Art', icon: 'palette' },
+  { value: 'Music', icon: 'music-note' },
+  { value: 'Gaming', icon: 'gamepad-variant' },
+  { value: 'Tech', icon: 'laptop' },
+  { value: 'Photography', icon: 'camera' },
+  { value: 'Volunteering', icon: 'hand-heart' },
+  { value: 'Startups', icon: 'rocket-launch' },
+  { value: 'Language Exchange', icon: 'forum' },
+  { value: 'Board Games', icon: 'chess-rook' },
 ];
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const _MAX_YEAR = new Date().getFullYear();
+const ALL_YEARS = Array.from({ length: _MAX_YEAR - 1919 }, (_, i) => _MAX_YEAR - i);
+const COL_ITEM_H = 50;
+
+function DateColumnPicker({ visible, value, onConfirm, onCancel }) {
+  const init = (value instanceof Date && !isNaN(value.getTime())) ? value : new Date(1995, 0, 1);
+  const [selYear, setSelYear] = useState(init.getFullYear());
+  const [selMonth, setSelMonth] = useState(init.getMonth());
+  const [selDay, setSelDay] = useState(init.getDate());
+
+  const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+  const DAYS = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const safeDay = Math.min(selDay, daysInMonth);
+
+  const dayRef = useRef(null);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    const t = setTimeout(() => {
+      dayRef.current?.scrollToOffset({ offset: (safeDay - 1) * COL_ITEM_H, animated: false });
+      monthRef.current?.scrollToOffset({ offset: selMonth * COL_ITEM_H, animated: false });
+      const yIdx = ALL_YEARS.indexOf(selYear);
+      if (yIdx >= 0) yearRef.current?.scrollToOffset({ offset: yIdx * COL_ITEM_H, animated: false });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [visible]);
+
+  useEffect(() => {
+    if (selDay !== safeDay) setSelDay(safeDay);
+    dayRef.current?.scrollToOffset({ offset: (safeDay - 1) * COL_ITEM_H, animated: true });
+  }, [daysInMonth]);
+
+  const makeHandler = (items, callback) => (e) => {
+    const idx = Math.max(0, Math.min(Math.round(e.nativeEvent.contentOffset.y / COL_ITEM_H), items.length - 1));
+    callback(items[idx]);
+  };
+
+  const renderCol = (ref, data, selectedVal, onScroll, labelFn) => (
+    <View style={{ flex: 1 }}>
+      <View pointerEvents="none" style={{
+        position: 'absolute', top: COL_ITEM_H * 2, left: 4, right: 4,
+        height: COL_ITEM_H, backgroundColor: '#F0FDF4',
+        borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: '#2EDC9A',
+        borderRadius: 10,
+      }} />
+      <FlatList
+        ref={ref}
+        data={data}
+        keyExtractor={(_, i) => String(i)}
+        snapToInterval={COL_ITEM_H}
+        decelerationRate="fast"
+        showsVerticalScrollIndicator={false}
+        style={{ height: COL_ITEM_H * 5 }}
+        contentContainerStyle={{ paddingVertical: COL_ITEM_H * 2 }}
+        onMomentumScrollEnd={onScroll}
+        renderItem={({ item }) => {
+          const isSelected = item === selectedVal;
+          return (
+            <View style={{ height: COL_ITEM_H, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{
+                fontSize: isSelected ? 20 : 15,
+                fontWeight: isSelected ? '700' : '400',
+                color: isSelected ? '#065F46' : '#9CA3AF',
+              }}>
+                {labelFn(item)}
+              </Text>
+            </View>
+          );
+        }}
+      />
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+        <View style={{ backgroundColor: '#FFF', borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingBottom: 30 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderColor: '#E5E7EB' }}>
+            <Pressable onPress={onCancel}><Text style={{ color: '#6B7280', fontSize: 16, fontWeight: '600' }}>Cancel</Text></Pressable>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: '#1F2937' }}>Date of Birth</Text>
+            <Pressable onPress={() => onConfirm(new Date(selYear, selMonth, safeDay))}>
+              <Text style={{ color: '#2EDC9A', fontSize: 16, fontWeight: '700' }}>Done</Text>
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 4, paddingTop: 8, paddingBottom: 2 }}>
+            <Text style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9CA3AF', fontWeight: '600', letterSpacing: 0.5 }}>DAY</Text>
+            <Text style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9CA3AF', fontWeight: '600', letterSpacing: 0.5 }}>MONTH</Text>
+            <Text style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9CA3AF', fontWeight: '600', letterSpacing: 0.5 }}>YEAR</Text>
+          </View>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 4 }}>
+            {renderCol(dayRef, DAYS, safeDay, makeHandler(DAYS, setSelDay), (d) => String(d).padStart(2, '0'))}
+            {renderCol(monthRef, MONTH_LABELS, MONTH_LABELS[selMonth], makeHandler(MONTH_LABELS, (m) => setSelMonth(MONTH_LABELS.indexOf(m))), (m) => m)}
+            {renderCol(yearRef, ALL_YEARS, selYear, makeHandler(ALL_YEARS, setSelYear), (y) => String(y))}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export default function UserProfileScreen() {
   const { db, currentUser, userProfile, profileLoading, updateUserProfile } = useNativeApp();
@@ -56,10 +161,12 @@ export default function UserProfileScreen() {
   const [showLocalityModal, setShowLocalityModal] = useState(false);
   const [localitySearch, setLocalitySearch] = useState('');
   const [showDietaryModal, setShowDietaryModal] = useState(false);
+  const [showDobPicker, setShowDobPicker] = useState(false);
 
   const [form, setForm] = useState({
     displayName: '',
     fullName: '',
+    dateOfBirth: '',
     phoneNumber: '',
     city: '',
     gender: '',
@@ -93,6 +200,7 @@ export default function UserProfileScreen() {
           setForm({
             displayName: data.displayName || currentUser.displayName || '',
             fullName: data.fullName || '',
+            dateOfBirth: data.dateOfBirth || '',
             phoneNumber: data.phoneNumber || '',
             city: data.city || '',
             gender: data.gender || '',
@@ -150,6 +258,38 @@ export default function UserProfileScreen() {
     return found ? found.label : 'No preference';
   }, [form.dietary]);
 
+  const formatDateValue = (date) => {
+    const y = String(date.getFullYear());
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const parseDateValue = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getGeneration = (dob) => {
+    if (!dob || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) return null;
+    const year = parseInt(dob.substring(0, 4), 10);
+    if (year >= 2013) return { label: 'Gen Alpha', range: '2013 – present', icon: 'star-shooting', color: '#7C3AED' };
+    if (year >= 1997) return { label: 'Gen Z',      range: '1997 – 2012',   icon: 'cellphone',     color: '#2563EB' };
+    if (year >= 1981) return { label: 'Millennial', range: '1981 – 1996',   icon: 'laptop',        color: '#0891B2' };
+    if (year >= 1965) return { label: 'Gen X',      range: '1965 – 1980',   icon: 'guitar-electric', color: '#D97706' };
+    if (year >= 1946) return { label: 'Baby Boomer',range: '1946 – 1964',   icon: 'peace',         color: '#059669' };
+    if (year >= 1928) return { label: 'Silent Gen', range: '1928 – 1945',   icon: 'radio',         color: '#6B7280' };
+    return { label: 'Greatest Gen', range: 'before 1928', icon: 'medal', color: '#B45309' };
+  };
+
+  const openDobPicker = () => setShowDobPicker(true);
+
+  const onDobConfirm = (date) => {
+    setForm((p) => ({ ...p, dateOfBirth: formatDateValue(date) }));
+    setShowDobPicker(false);
+  };
+
   const selectLocality = (loc) => {
     const label = `${loc.country || ''} -> ${loc.city || ''} -> ${loc.area || ''}`;
     setForm((prev) => ({
@@ -183,6 +323,10 @@ export default function UserProfileScreen() {
       setMessage('Display name is required.');
       return;
     }
+    if (form.dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(form.dateOfBirth.trim())) {
+      setMessage('Date of birth must be in YYYY-MM-DD format (including year).');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -192,6 +336,7 @@ export default function UserProfileScreen() {
         displayName: form.displayName.trim(),
         name: form.displayName.trim(),
         fullName: form.fullName.trim(),
+        dateOfBirth: form.dateOfBirth.trim(),
         phoneNumber: form.phoneNumber.trim(),
         city: form.city.trim(),
         gender: form.gender,
@@ -247,6 +392,31 @@ export default function UserProfileScreen() {
           placeholder="Your full name"
         />
 
+        <Text style={styles.label}>Date of Birth</Text>
+        {Platform.OS === 'web' ? (
+          <TextInput
+            style={styles.input}
+            value={form.dateOfBirth}
+            onChangeText={(v) => setForm((p) => ({ ...p, dateOfBirth: v }))}
+            placeholder="YYYY-MM-DD"
+            keyboardType="numbers-and-punctuation"
+            maxLength={10}
+          />
+        ) : (
+          <Pressable style={styles.selectorField} onPress={openDobPicker}>
+            <Text style={styles.selectorText}>{form.dateOfBirth || 'Tap to select date of birth'}</Text>
+          </Pressable>
+        )}
+        {(() => { const gen = getGeneration(form.dateOfBirth); return gen ? (
+          <View style={styles.genBadge}>
+            <MaterialCommunityIcons name={gen.icon} size={18} color={gen.color} />
+            <Text style={[styles.genBadgeText, { color: gen.color }]}>{gen.label}</Text>
+            <Text style={styles.genBadgeRange}>{gen.range}</Text>
+          </View>
+        ) : (
+          <Text style={styles.fieldHint}>Once entered, we will show you your generation. Also helps match you with people of a similar age.</Text>
+        ); })()}
+
         <Text style={styles.label}>Phone</Text>
         <TextInput
           style={styles.input}
@@ -263,6 +433,7 @@ export default function UserProfileScreen() {
           onChangeText={(v) => setForm((p) => ({ ...p, city: v }))}
           placeholder="Cairo"
         />
+        <Text style={styles.fieldHint}>Helps us match you with people nearby.</Text>
 
         <Text style={styles.label}>Gender</Text>
         <View style={styles.genderRow}>
@@ -310,7 +481,12 @@ export default function UserProfileScreen() {
                 style={[styles.interestCard, active && styles.interestCardActive]}
                 onPress={() => toggleInterest(interest.value)}
               >
-                <Text style={styles.interestIcon}>{interest.icon}</Text>
+                <MaterialCommunityIcons
+                  name={interest.icon}
+                  size={22}
+                  color={active ? '#2EDC9A' : '#6B7280'}
+                  style={styles.interestIcon}
+                />
                 <Text style={[styles.interestText, active && styles.interestTextActive]}>{interest.value}</Text>
               </Pressable>
             );
@@ -322,7 +498,7 @@ export default function UserProfileScreen() {
           style={[styles.input, styles.textarea]}
           value={form.experience}
           onChangeText={(v) => setForm((p) => ({ ...p, experience: v }))}
-          placeholder="Tell us about your background"
+          placeholder="Tell us about your background — used to match you with like-minded people"
           multiline
         />
       </View>
@@ -386,6 +562,13 @@ export default function UserProfileScreen() {
           />
         </View>
       </Modal>
+
+      <DateColumnPicker
+        visible={showDobPicker && Platform.OS !== 'web'}
+        value={parseDateValue(form.dateOfBirth)}
+        onConfirm={onDobConfirm}
+        onCancel={() => setShowDobPicker(false)}
+      />
     </ScrollView>
   );
 }
@@ -505,8 +688,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
   },
   interestIcon: {
-    fontSize: 22,
     marginBottom: 8,
+  },
+  fieldHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    marginBottom: 2,
+    lineHeight: 17,
+  },
+  genBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 4,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  },
+  genBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  genBadgeRange: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   interestText: {
     color: '#1F2937',
@@ -586,6 +798,7 @@ const styles = StyleSheet.create({
   listRowTextActive: {
     color: '#2EDC9A',
   },
+
   emptyText: {
     color: '#1F2937',
     fontSize: 14,
@@ -599,7 +812,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#0B5D40',
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '700',

@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#0B5D40',
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '700',

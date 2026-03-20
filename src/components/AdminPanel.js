@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   rowMeta: { fontSize: 13, color: '#4B5563', marginBottom: 3 },
   rowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   primaryButton: { flex: 1, backgroundColor: '#2EDC9A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
-  primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  primaryButtonText: { color: '#0B5D40', textAlign: 'center', fontWeight: '700', fontSize: 13 },
   secondaryButton: { flex: 1, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
   secondaryButtonText: { color: '#1F2937', textAlign: 'center', fontWeight: '600', fontSize: 13 },
   dangerButton: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },

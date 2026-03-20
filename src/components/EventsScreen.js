@@ -17,7 +17,6 @@ import {
   doc,
   increment,
   onSnapshot,
-  orderBy,
   query,
   runTransaction,
   updateDoc,
@@ -82,14 +81,15 @@ function EventCard({
 }) {
   const eventDate = event.dateTime ? new Date(event.dateTime).toLocaleString() : '-';
   const priceLabel = Number(event.price || 0) === 0 ? 'Free' : `${event.price} ${event.currency || 'EGP'}`;
+  const creatorDisplayName = event.creatorName || event.createdByName || event.creatorEmail || (event.createdBy ? (isCreator ? 'You' : 'Organizer') : null);
 
   return (
     <View style={styles.eventCard}>
       <View style={styles.eventHeaderRow}>
         <View style={styles.eventTitleWrapper}>
           <Text style={styles.eventTitle}>{event.title || 'Untitled event'}</Text>
-          {event.creatorName && (
-            <Text style={styles.creatorLabel}>Created by {event.creatorName}</Text>
+          {creatorDisplayName && (
+            <Text style={styles.creatorLabel}>Created by {creatorDisplayName}</Text>
           )}
         </View>
         {isCreator && (
@@ -190,17 +190,30 @@ export default function EventsScreen() {
     if (!db || !currentUser?.uid) return undefined;
     const q = query(
       collection(db, 'bookings'),
-      where('userId', '==', currentUser.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', currentUser.uid)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const mapped = {};
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        mapped[data.eventId] = { id: d.id, ...data };
-      });
-      setBookingsMap(mapped);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const mapped = {};
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          if (!data?.eventId) return;
+
+          const prev = mapped[data.eventId];
+          const prevTs = prev?.createdAt || prev?.lastUpdated || '';
+          const nextTs = data?.createdAt || data?.lastUpdated || '';
+
+          if (!prev || nextTs >= prevTs) {
+            mapped[data.eventId] = { id: d.id, ...data };
+          }
+        });
+        setBookingsMap(mapped);
+      },
+      (error) => {
+        console.error('Bookings listener failed:', error);
+      }
+    );
     return unsub;
   }, [db, currentUser?.uid]);
 
@@ -611,15 +624,15 @@ export default function EventsScreen() {
               placeholder="0"
             />
 
-            <View style={styles.modalButtons}>
+            <View style={styles.createModalButtons}>
               <Pressable
-                style={[styles.primaryButton, (createBusy || !organizerLocalityLabel) && styles.buttonDisabled]}
+                style={[styles.primaryButton, styles.createModalButton, (createBusy || !organizerLocalityLabel) && styles.buttonDisabled]}
                 disabled={createBusy || !organizerLocalityLabel}
                 onPress={handleCreate}
               >
                 <Text style={styles.primaryButtonText}>{createBusy ? 'Saving...' : 'Publish'}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => setShowCreate(false)}>
+              <Pressable style={[styles.secondaryButton, styles.createModalButton]} onPress={() => setShowCreate(false)}>
                 <Text style={styles.secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>
@@ -765,15 +778,15 @@ export default function EventsScreen() {
               placeholder="0"
             />
 
-            <View style={styles.modalButtons}>
+            <View style={styles.editModalButtons}>
               <Pressable
-                style={[styles.primaryButton, editBusy && styles.buttonDisabled]}
+                style={[styles.primaryButton, styles.editModalButton, editBusy && styles.buttonDisabled]}
                 disabled={editBusy}
                 onPress={handleUpdateEvent}
               >
                 <Text style={styles.primaryButtonText}>{editBusy ? 'Saving...' : 'Update Event'}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryButton} onPress={() => setShowEditModal(false)}>
+              <Pressable style={[styles.secondaryButton, styles.editModalButton]} onPress={() => setShowEditModal(false)}>
                 <Text style={styles.secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>
@@ -790,18 +803,18 @@ export default function EventsScreen() {
             </Text>
             <View style={styles.confirmButtons}>
               <Pressable
-                style={[styles.secondaryButton, styles.confirmButton]}
+                style={[styles.confirmCancelButton, styles.confirmButton]}
                 onPress={() => setShowDeleteConfirm(false)}
                 disabled={editBusy}
               >
                 <Text style={styles.secondaryButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.deleteButton, styles.confirmButton]}
+                style={[styles.confirmDeleteButton, styles.confirmButton, editBusy && styles.buttonDisabled]}
                 onPress={handleConfirmDelete}
                 disabled={editBusy}
               >
-                <Text style={styles.deleteButtonText}>{editBusy ? '...' : 'Delete'}</Text>
+                <Text style={styles.confirmDeleteButtonText}>{editBusy ? 'Deleting...' : 'Delete Event'}</Text>
               </Pressable>
             </View>
           </View>
@@ -932,7 +945,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#0B5D40',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -1072,6 +1085,24 @@ const styles = StyleSheet.create({
   modalButtons: {
     marginTop: 10,
   },
+  createModalButtons: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  createModalButton: {
+    flex: 1,
+    marginTop: 0,
+  },
+  editModalButtons: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editModalButton: {
+    flex: 1,
+    marginTop: 0,
+  },
   deleteButton: {
     backgroundColor: '#FEE2E2',
   },
@@ -1086,16 +1117,23 @@ const styles = StyleSheet.create({
   },
   confirmDialog: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 20,
     margin: 20,
+    width: '88%',
+    maxWidth: 360,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    elevation: 8,
   },
   confirmTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#B91C1C',
     marginBottom: 12,
   },
   confirmMessage: {
@@ -1111,5 +1149,27 @@ const styles = StyleSheet.create({
   confirmButton: {
     flex: 1,
     marginTop: 0,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  confirmCancelButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  confirmDeleteButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  confirmDeleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

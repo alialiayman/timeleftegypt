@@ -23,6 +23,7 @@ const resources = {
       admin: 'Organizer',
       superAdmin: 'Master',
       events: 'Events',
+      friends: 'Friends',
 
       // Auth
       signIn: 'Sign In',
@@ -426,6 +427,7 @@ const resources = {
       admin: 'المنظّم',
       superAdmin: 'الماستر',
       events: 'الفعاليات',
+      friends: 'الأصدقاء',
 
       // Auth
       signIn: 'تسجيل الدخول',

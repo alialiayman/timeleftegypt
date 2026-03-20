@@ -23,6 +23,7 @@ import { getAuth, GoogleAuthProvider, signInWithCredential, signOut } from 'fire
 import { getFirestore } from 'firebase/firestore';
 import EventsScreen from './src/components/EventsScreen';
 import DashboardScreen from './src/components/Dashboard';
+import FriendsScreen from './src/components/FriendsScreen';
 import UserProfileScreen from './src/components/UserProfile';
 import AdminPanelScreen from './src/components/AdminPanel';
 import SuperAdminPanelScreen from './src/components/SuperAdminPanel';
@@ -149,6 +150,25 @@ function ProfileSetupScreen({
 
 function TabIcon({ name, color, size }) {
   return <MaterialCommunityIcons name={name} color={color} size={size} />;
+}
+
+function MoreMenuScreen({ navigation, items }) {
+  return (
+    <View style={styles.moreScreen}>
+      <Text style={styles.moreTitle}>More</Text>
+      <Text style={styles.moreSubtitle}>Extra sections</Text>
+      <View style={styles.moreCard}>
+        {items.map((item) => (
+          <Pressable key={item.name} style={styles.moreButton} onPress={() => navigation.navigate(item.name)}>
+            <View style={styles.moreButtonIconWrap}>
+              <TabIcon name={item.icon} color="#0B5D40" size={18} />
+            </View>
+            <Text style={styles.moreButtonText}>{item.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 export default function App() {
@@ -335,21 +355,34 @@ function AppContent() {
   };
 
   const tabs = useMemo(() => {
-    const tabScreens = [
+    const baseTabs = [
       { name: 'Dashboard', icon: 'view-dashboard-outline', component: DashboardScreen, props: { onSignOut: signOutNative } },
       { name: 'Events', icon: 'calendar-star', component: EventsScreen, props: {} },
+      { name: 'Friends', icon: 'account-group-outline', component: FriendsScreen, props: {} },
       { name: 'Profile', icon: 'account-circle-outline', component: UserProfileScreen, props: {} },
     ];
 
+    const overflowTabs = [];
+
     if (isAdminRole) {
-      tabScreens.push({ name: 'Organizer', icon: 'shield-account-outline', component: AdminPanelScreen, props: {} });
+      overflowTabs.push({ name: 'Organizer', icon: 'shield-account-outline', component: AdminPanelScreen, props: {} });
     }
 
     if (isSuperAdminRole) {
-      tabScreens.push({ name: 'Master', icon: 'crown-outline', component: SuperAdminPanelScreen, props: {} });
+      overflowTabs.push({ name: 'Master', icon: 'crown-outline', component: SuperAdminPanelScreen, props: {} });
     }
 
-    return tabScreens;
+    if (overflowTabs.length > 0) {
+      baseTabs.push({
+        name: 'More',
+        icon: 'dots-horizontal-circle-outline',
+        component: MoreMenuScreen,
+        props: { items: overflowTabs },
+      });
+    }
+
+    const hiddenOverflowTabs = overflowTabs.map((tab) => ({ ...tab, hidden: true }));
+    return [...baseTabs, ...hiddenOverflowTabs];
   }, [isAdminRole, isSuperAdminRole, signOutNative]);
 
   const flow = !currentUser ? 'guest' : userProfile ? 'main' : 'setup';
@@ -392,6 +425,7 @@ function AppContent() {
               tabBarIcon: ({ color, size }) => (
                 <TabIcon name={current?.icon || 'circle-outline'} color={color} size={size} />
               ),
+              tabBarButton: current?.hidden ? () => null : undefined,
               headerStyle: { backgroundColor: '#FFFFFF' },
               headerTintColor: '#1F2937',
               tabBarActiveTintColor: '#2EDC9A',
@@ -403,7 +437,11 @@ function AppContent() {
                 backgroundColor: '#FFFFFF',
                 borderTopColor: '#E5E7EB',
                 borderTopWidth: 1,
+                justifyContent: 'space-between',
               },
+              tabBarItemStyle: current?.hidden
+                ? { display: 'none' }
+                : { flex: 1, maxWidth: 'none' },
               tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
             };
           }}
@@ -511,7 +549,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: '#0B5D40',
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
@@ -533,5 +571,54 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  moreScreen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#FAFAF7',
+  },
+  moreTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  moreSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  moreCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    gap: 8,
+  },
+  moreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  moreButtonIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#D1FAE5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreButtonText: {
+    color: '#1F2937',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

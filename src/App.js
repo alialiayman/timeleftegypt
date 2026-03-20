@@ -10,6 +10,7 @@ import UserProfile from './components/UserProfile';
 import AdminPanel from './components/AdminPanel';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import EventsScreen from './components/EventsScreen';
+import FriendsPage from './components/FriendsPage';
 
 const getLegalTypeFromPath = (pathname) => {
   const normalized = pathname.replace(/\/+$/, '') || '/';
@@ -30,11 +31,15 @@ function AppContent() {
     return () => window.removeEventListener('popstate', onNavigation);
   }, []);
 
+  useEffect(() => {
+    const normalizedLang = i18n.language === 'ar' ? 'ar' : 'en';
+    document.documentElement.dir = normalizedLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = normalizedLang;
+  }, [i18n.language]);
+
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'ar' : 'en';
     i18n.changeLanguage(newLang);
-    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = newLang;
   };
 
   /** Returns the display-role string based on priority: Super Admin > Admin > Friend */
@@ -85,6 +90,8 @@ function AppContent() {
           <Dashboard setCurrentView={setCurrentView} onSignOut={logout} />;
       case 'events':
         return <EventsScreen setCurrentView={setCurrentView} />;
+      case 'friends':
+        return <FriendsPage />;
       default:
         return <Dashboard setCurrentView={setCurrentView} onSignOut={logout} />;
     }
@@ -113,6 +120,12 @@ function AppContent() {
                 onClick={() => setCurrentView('events')}
               >
                 {t('events')}
+              </button>
+              <button
+                className={`nav-btn ${currentView === 'friends' ? 'active' : ''}`}
+                onClick={() => setCurrentView('friends')}
+              >
+                {t('friends')}
               </button>
               <button
                 className={`nav-btn ${currentView === 'profile' ? 'active' : ''}`}

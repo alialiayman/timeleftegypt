@@ -234,10 +234,10 @@ export default function SuperAdminPanelScreen() {
           />
 
           <View style={styles.formActions}>
-            <Pressable style={[styles.primaryButton, saving && styles.disabled]} onPress={saveForm} disabled={saving}>
+            <Pressable style={[styles.primaryButton, styles.formActionButton, saving && styles.disabled]} onPress={saveForm} disabled={saving}>
               <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={resetForm}>
+            <Pressable style={[styles.secondaryButton, styles.formActionButton]} onPress={resetForm}>
               <Text style={styles.secondaryButtonText}>Cancel</Text>
             </Pressable>
           </View>
@@ -284,9 +284,10 @@ const styles = StyleSheet.create({
   userCheckName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
   userCheckNameActive: { color: '#2EDC9A' },
   userCheckMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  formActions: { marginTop: 8 },
+  formActions: { marginTop: 8, flexDirection: 'row', gap: 8 },
+  formActionButton: { flex: 1, marginTop: 0 },
   primaryButton: { backgroundColor: '#2EDC9A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
-  primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  primaryButtonText: { color: '#0B5D40', textAlign: 'center', fontWeight: '700', fontSize: 13 },
   secondaryButton: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
   secondaryButtonText: { color: '#1F2937', textAlign: 'center', fontWeight: '600', fontSize: 13 },
   dangerButton: { backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },

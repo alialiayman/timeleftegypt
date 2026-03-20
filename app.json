@@ -1,9 +1,9 @@
 {
   "scheme": "com.timeleftgatherly.app",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "ios": {
     "bundleIdentifier": "com.timeleftgatherly.app",
-    "buildNumber": "2",
+    "buildNumber": "4",
     "googleServicesFile": "./GoogleService-Info.plist",
     "infoPlist": {
       "CFBundleURLTypes": [
@@ -15,5 +15,7 @@
         }
       ]
     }
-  }
+  },
+  "plugins": [
+  ]
 }

@@ -174,6 +174,7 @@ export function AuthProvider({ children }) {
         displayName: profileData.displayName || currentProfile.displayName || currentUser.displayName || '',
         name: profileData.name || profileData.displayName || currentProfile.name || currentUser.displayName || '',
         fullName: profileData.fullName !== undefined ? profileData.fullName : currentProfile.fullName || '',
+        dateOfBirth: profileData.dateOfBirth !== undefined ? profileData.dateOfBirth : currentProfile.dateOfBirth || '',
         city: profileData.city !== undefined ? profileData.city : currentProfile.city || '',
         phoneNumber: profileData.phoneNumber !== undefined ? profileData.phoneNumber : currentProfile.phoneNumber || '',
         localityId: profileData.localityId !== undefined ? profileData.localityId : currentProfile.localityId || '',

@@ -62,6 +62,10 @@ export function NativeAppProvider({ auth, db, children }) {
           profilePatch.fullName !== undefined
             ? profilePatch.fullName
             : existing.fullName || '',
+        dateOfBirth:
+          profilePatch.dateOfBirth !== undefined
+            ? profilePatch.dateOfBirth
+            : existing.dateOfBirth || '',
         phoneNumber:
           profilePatch.phoneNumber !== undefined
             ? profilePatch.phoneNumber

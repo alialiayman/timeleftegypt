@@ -66,6 +66,7 @@ export const RATING_VALUES = {
  * @property {string} fullName
  * @property {string} [photoURL]
  * @property {string} [gender] - 'male' | 'female' | 'other'
+ * @property {string} [dateOfBirth] - YYYY-MM-DD
  * @property {string} [city]
  * @property {string} [phoneNumber]
  * @property {UserRole} role
@@ -87,6 +88,7 @@ export const createUser = (overrides = {}) => ({
   fullName: '',
   photoURL: null,
   gender: '',
+  dateOfBirth: '',
   city: '',
   phoneNumber: '',
   role: USER_ROLES.FRIEND,

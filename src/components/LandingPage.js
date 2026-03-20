@@ -123,6 +123,10 @@ function LandingPage() {
           </nav>
 
           <div className="lp-header__actions">
+            <div className="lp-header__legal-links" aria-label="legal links">
+              <a href="/privacy-policy" className="lp-header__legal-link">{t('footerPrivacyPolicy')}</a>
+              <a href="/terms-of-service" className="lp-header__legal-link">{t('footerTerms')}</a>
+            </div>
             <button
               className="lp-btn lp-btn--ghost lp-lang-btn"
               onClick={toggleLanguage}

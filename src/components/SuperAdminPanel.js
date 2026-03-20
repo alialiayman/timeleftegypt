@@ -187,7 +187,7 @@ export default function SuperAdminPanelScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#f97316" />
+        <ActivityIndicator size="large" color="#2EDC9A" />
       </View>
     );
   }
@@ -272,29 +272,29 @@ export default function SuperAdminPanelScreen() {
 const styles = StyleSheet.create({
   screen: { paddingHorizontal: 16, paddingBottom: 20 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 26, fontWeight: '700', color: '#9a3412', marginBottom: 10 },
+  title: { fontSize: 26, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
   actionsTop: { marginBottom: 10 },
-  card: { borderRadius: 14, borderWidth: 1, borderColor: '#fdba74', backgroundColor: '#fff', padding: 14, marginBottom: 12 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#9a3412', marginBottom: 8 },
-  label: { fontSize: 14, color: '#7c2d12', fontWeight: '600', marginBottom: 6, marginTop: 8 },
-  input: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#9a3412', backgroundColor: '#fff' },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14, marginBottom: 12 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  label: { fontSize: 14, color: '#1F2937', fontWeight: '600', marginBottom: 6, marginTop: 8 },
+  input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#1F2937', backgroundColor: '#fff' },
   userList: { marginTop: 8 },
-  userCheck: { borderWidth: 1, borderColor: '#fed7aa', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff7ed' },
-  userCheckActive: { borderColor: '#f97316', backgroundColor: '#ffedd5' },
-  userCheckName: { fontSize: 14, fontWeight: '600', color: '#7c2d12' },
-  userCheckNameActive: { color: '#f97316' },
-  userCheckMeta: { fontSize: 12, color: '#546b88', marginTop: 2 },
+  userCheck: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#F3F4F6' },
+  userCheckActive: { borderColor: '#2EDC9A', backgroundColor: '#F0FDF4' },
+  userCheckName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
+  userCheckNameActive: { color: '#2EDC9A' },
+  userCheckMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   formActions: { marginTop: 8 },
-  primaryButton: { backgroundColor: '#f97316', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  primaryButton: { backgroundColor: '#2EDC9A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
   primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
-  secondaryButton: { backgroundColor: '#fff1e6', borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
-  secondaryButtonText: { color: '#9a3412', textAlign: 'center', fontWeight: '600', fontSize: 13 },
-  dangerButton: { backgroundColor: '#fbe9e8', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
-  dangerButtonText: { color: '#8f1f1a', textAlign: 'center', fontWeight: '700', fontSize: 13 },
-  localityRow: { borderWidth: 1, borderColor: '#fed7aa', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#fff7ed' },
-  localityTitle: { fontSize: 14, fontWeight: '700', color: '#7c2d12' },
-  localityMeta: { fontSize: 12, color: '#546b88', marginTop: 3 },
+  secondaryButton: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  secondaryButtonText: { color: '#1F2937', textAlign: 'center', fontWeight: '600', fontSize: 13 },
+  dangerButton: { backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  dangerButtonText: { color: '#7F1D1D', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  localityRow: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#F3F4F6' },
+  localityTitle: { fontSize: 14, fontWeight: '700', color: '#1F2937' },
+  localityMeta: { fontSize: 12, color: '#6B7280', marginTop: 3 },
   rowButtons: { flexDirection: 'row', gap: 8 },
-  empty: { fontSize: 14, color: '#9a3412' },
+  empty: { fontSize: 14, color: '#1F2937' },
   disabled: { opacity: 0.6 },
 });

@@ -69,7 +69,17 @@ const makeDefaultNewEvent = () => {
   };
 };
 
-function EventCard({ event, isBooked, onBook, onCancel, busy }) {
+function EventCard({ 
+  event, 
+  isBooked, 
+  onBook, 
+  onCancel, 
+  busy,
+  isCreator,
+  onEdit,
+  onDelete,
+  onRunAlgorithm,
+}) {
   const eventDate = event.dateTime ? new Date(event.dateTime).toLocaleString() : '-';
   const priceLabel = Number(event.price || 0) === 0 ? 'Free' : `${event.price} ${event.currency || 'EGP'}`;
 
@@ -84,7 +94,19 @@ function EventCard({ event, isBooked, onBook, onCancel, busy }) {
       <Text style={styles.eventMeta}>Price: {priceLabel}</Text>
       {event.description ? <Text style={styles.eventDescription}>{event.description}</Text> : null}
 
-      {isBooked ? (
+      {isCreator ? (
+        <View>
+          <Pressable style={styles.primaryButton} onPress={() => onRunAlgorithm(event)} disabled={busy}>
+            <Text style={styles.primaryButtonText}>{busy ? '...' : 'Run Match Algorithm'}</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => onEdit(event)} disabled={busy}>
+            <Text style={styles.secondaryButtonText}>{busy ? '...' : 'Edit Event'}</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryButton, styles.deleteButton]} onPress={() => onDelete(event)} disabled={busy}>
+            <Text style={[styles.secondaryButtonText, styles.deleteButtonText]}>{busy ? '...' : 'Delete Event'}</Text>
+          </Pressable>
+        </View>
+      ) : isBooked ? (
         <Pressable style={styles.secondaryButton} onPress={() => onCancel(event)} disabled={busy}>
           <Text style={styles.secondaryButtonText}>{busy ? '...' : 'Cancel Booking'}</Text>
         </Pressable>
@@ -109,10 +131,19 @@ export default function EventsScreen() {
   const [message, setMessage] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editFormData, setEditFormData] = useState(makeDefaultNewEvent());
+  const [editBusy, setEditBusy] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState(null);
 
   useEffect(() => {
     if (!db) return undefined;
-    const q = query(collection(db, 'events'), where('status', '==', 'published'));
+    const q = query(
+      collection(db, 'events'), 
+      where('status', '==', 'published')
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -328,9 +359,104 @@ export default function EventsScreen() {
     }
   };
 
+  const handleEdit = (event) => {
+    const eventDateTime = event.dateTime ? new Date(event.dateTime) : new Date();
+    setEditingEvent(event);
+    setEditFormData({
+      title: event.title || '',
+      description: event.description || '',
+      type: event.type || 'dinner',
+      locality: event.locality || organizerLocalityLabel,
+      address: event.address || '',
+      mapUrl: event.mapUrl || '',
+      date: toDateValue(eventDateTime),
+      time: toTimeValue(eventDateTime),
+      price: String(event.price || 0),
+      currency: event.currency || 'EGP',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!db || !editingEvent) return;
+    if (!editFormData.title.trim() || !editFormData.date || !editFormData.time) {
+      setMessage('Title and date/time are required.');
+      return;
+    }
+    if (editFormData.mapUrl && !/^https?:\/\//i.test(editFormData.mapUrl.trim())) {
+      setMessage('Map URL must start with http:// or https://');
+      return;
+    }
+
+    setEditBusy(true);
+    try {
+      const when = new Date(`${editFormData.date}T${editFormData.time}:00`);
+      if (Number.isNaN(when.getTime())) {
+        setMessage('Please select a valid date and time.');
+        setEditBusy(false);
+        return;
+      }
+
+      const updatePayload = {
+        title: editFormData.title.trim(),
+        description: editFormData.description.trim(),
+        type: editFormData.type,
+        address: editFormData.address.trim(),
+        mapUrl: editFormData.mapUrl.trim(),
+        googleMapsLink: editFormData.mapUrl.trim(),
+        dateTime: when.toISOString(),
+        price: Number(editFormData.price || 0),
+        currency: editFormData.currency || 'EGP',
+        lastUpdated: new Date().toISOString(),
+      };
+
+      await updateDoc(doc(db, 'events', editingEvent.id), updatePayload);
+      setShowEditModal(false);
+      setEditingEvent(null);
+      setMessage('Event updated successfully.');
+    } catch (error) {
+      console.error('Update event failed:', error);
+      setMessage('Could not update event.');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleDelete = (event) => {
+    setDeletingEventId(event.id);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!db || !deletingEventId) return;
+    
+    setEditBusy(true);
+    try {
+      await updateDoc(doc(db, 'events', deletingEventId), {
+        status: 'deleted',
+        lastUpdated: new Date().toISOString(),
+      });
+      setShowDeleteConfirm(false);
+      setDeletingEventId(null);
+      setMessage('Event deleted successfully.');
+    } catch (error) {
+      console.error('Delete event failed:', error);
+      setMessage('Could not delete event.');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleRunAlgorithm = (event) => {
+    // Placeholder for match algorithm
+    setMessage(`Match algorithm placeholder: Would run for event "${event.title}"`);
+    console.log('Running match algorithm for event:', event.id);
+  };
+
   const renderItem = ({ item }) => {
     const booking = bookingsMap[item.id];
     const isBooked = booking?.status === BOOKING_STATUS.CONFIRMED;
+    const isCreator = currentUser?.uid === item.createdBy;
 
     return (
       <EventCard
@@ -339,6 +465,10 @@ export default function EventsScreen() {
         onBook={handleBook}
         onCancel={handleCancel}
         busy={busyEventId === item.id}
+        isCreator={isCreator}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onRunAlgorithm={handleRunAlgorithm}
       />
     );
   };
@@ -364,7 +494,7 @@ export default function EventsScreen() {
 
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#f97316" />
+          <ActivityIndicator size="large" color="#2EDC9A" />
         </View>
       ) : events.length === 0 ? (
         <View style={styles.loadingWrap}>
@@ -532,6 +662,127 @@ export default function EventsScreen() {
           />
         </SafeAreaView>
       </Modal>
+
+      <Modal visible={showEditModal} animationType="slide" onRequestClose={() => setShowEditModal(false)}>
+        <SafeAreaView style={styles.modalScreen}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Event</Text>
+
+            <Text style={styles.inputLabel}>Type</Text>
+            <View style={styles.typeRow}>
+              {EVENT_TYPES.map((type) => (
+                <Pressable
+                  key={type.key}
+                  style={[styles.typeChip, editFormData.type === type.key && styles.typeChipActive]}
+                  onPress={() => setEditFormData((prev) => ({ ...prev, type: type.key }))}
+                >
+                  <Text style={[styles.typeChipText, editFormData.type === type.key && styles.typeChipTextActive]}>
+                    {type.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Title</Text>
+            <TextInput
+              style={styles.input}
+              value={editFormData.title}
+              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, title: v }))}
+              placeholder="Friday Movie Night"
+            />
+
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              multiline
+              value={editFormData.description}
+              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, description: v }))}
+              placeholder="Describe the event"
+            />
+
+            <Text style={styles.inputLabel}>Locality</Text>
+            <View style={styles.readOnlyInput}>
+              <Text style={styles.readOnlyText}>{editFormData.locality || 'No locality assigned'}</Text>
+            </View>
+
+            <Text style={styles.inputLabel}>Address</Text>
+            <TextInput
+              style={styles.input}
+              value={editFormData.address}
+              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, address: v }))}
+              placeholder="Street, building, venue details"
+            />
+
+            <Text style={styles.inputLabel}>Google Maps URL</Text>
+            <TextInput
+              style={styles.input}
+              value={editFormData.mapUrl}
+              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, mapUrl: v }))}
+              placeholder="https://maps.google.com/..."
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.inputLabel}>Date</Text>
+            <Pressable style={styles.pickerField} onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.pickerText}>{editFormData.date}</Text>
+            </Pressable>
+
+            <Text style={styles.inputLabel}>Time</Text>
+            <Pressable style={styles.pickerField} onPress={() => setShowTimePicker(true)}>
+              <Text style={styles.pickerText}>{editFormData.time}</Text>
+            </Pressable>
+
+            <Text style={styles.inputLabel}>Price</Text>
+            <TextInput
+              style={styles.input}
+              value={editFormData.price}
+              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, price: v }))}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.primaryButton, editBusy && styles.buttonDisabled]}
+                disabled={editBusy}
+                onPress={handleUpdateEvent}
+              >
+                <Text style={styles.primaryButtonText}>{editBusy ? 'Saving...' : 'Update Event'}</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryButton} onPress={() => setShowEditModal(false)}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={() => setShowDeleteConfirm(false)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmDialog}>
+            <Text style={styles.confirmTitle}>Delete Event?</Text>
+            <Text style={styles.confirmMessage}>
+              Are you sure you want to delete this event? This action cannot be undone.
+            </Text>
+            <View style={styles.confirmButtons}>
+              <Pressable
+                style={[styles.secondaryButton, styles.confirmButton]}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={editBusy}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.deleteButton, styles.confirmButton]}
+                onPress={handleConfirmDelete}
+                disabled={editBusy}
+              >
+                <Text style={styles.deleteButtonText}>{editBusy ? '...' : 'Delete'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -539,7 +790,7 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#FAFAF7',
   },
   headerRow: {
     flexDirection: 'row',
@@ -549,21 +800,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderColor: '#fdba74',
-    backgroundColor: '#ffffff',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
   },
   banner: {
     marginHorizontal: 16,
     marginTop: 12,
-    backgroundColor: '#e7f2ff',
+    backgroundColor: '#E0F2FE',
     borderWidth: 1,
-    borderColor: '#c7dcf8',
-    color: '#1f4b8f',
+    borderColor: '#BAE6FD',
+    color: '#0369A1',
     borderRadius: 10,
     paddingVertical: 9,
     paddingHorizontal: 12,
@@ -576,59 +827,59 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#51627d',
+    color: '#6B7280',
   },
   listContent: {
     padding: 16,
     gap: 12,
   },
   eventCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 14,
     padding: 14,
   },
   eventTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 8,
   },
   eventMeta: {
     fontSize: 14,
-    color: '#2f435f',
+    color: '#4B5563',
     marginBottom: 3,
   },
   eventDescription: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#4b5f7a',
+    color: '#6B7280',
     marginTop: 8,
     marginBottom: 10,
   },
   primaryButton: {
-    backgroundColor: '#f97316',
+    backgroundColor: '#2EDC9A',
     borderRadius: 10,
     paddingVertical: 11,
     paddingHorizontal: 14,
     marginTop: 8,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
   secondaryButton: {
-    backgroundColor: '#fff1e6',
+    backgroundColor: '#F3F4F6',
     borderRadius: 10,
     paddingVertical: 11,
     paddingHorizontal: 14,
     marginTop: 8,
   },
   secondaryButtonText: {
-    color: '#9a3412',
+    color: '#1F2937',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
@@ -638,7 +889,7 @@ const styles = StyleSheet.create({
   },
   modalScreen: {
     flex: 1,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#FAFAF7',
   },
   modalContent: {
     padding: 16,
@@ -647,49 +898,49 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 12,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 8,
     marginTop: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#9a3412',
-    backgroundColor: '#ffffff',
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
   },
   readOnlyInput: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#F3F4F6',
   },
   readOnlyText: {
-    color: '#9a3412',
+    color: '#1F2937',
     fontSize: 15,
     fontWeight: '600',
   },
   pickerField: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   pickerText: {
-    color: '#9a3412',
+    color: '#1F2937',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -704,28 +955,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   closeText: {
-    color: '#ea580c',
+    color: '#2EDC9A',
     fontWeight: '700',
   },
   pickerRow: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 8,
   },
   pickerRowActive: {
-    borderColor: '#f97316',
-    backgroundColor: '#ffedd5',
+    borderColor: '#2EDC9A',
+    backgroundColor: '#F0FDF4',
   },
   pickerRowText: {
-    color: '#7c2d12',
+    color: '#1F2937',
     fontWeight: '600',
   },
   pickerRowTextActive: {
-    color: '#f97316',
+    color: '#2EDC9A',
   },
   typeRow: {
     flexDirection: 'row',
@@ -734,25 +985,65 @@ const styles = StyleSheet.create({
   },
   typeChip: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   typeChipActive: {
-    borderColor: '#f97316',
-    backgroundColor: '#ffedd5',
+    borderColor: '#2EDC9A',
+    backgroundColor: '#F0FDF4',
   },
   typeChipText: {
-    color: '#7c2d12',
+    color: '#1F2937',
     fontSize: 13,
     fontWeight: '600',
   },
   typeChipTextActive: {
-    color: '#f97316',
+    color: '#2EDC9A',
   },
   modalButtons: {
     marginTop: 10,
+  },
+  deleteButton: {
+    backgroundColor: '#FEE2E2',
+  },
+  deleteButtonText: {
+    color: '#DC2626',
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmDialog: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 20,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    marginTop: 0,
   },
 });

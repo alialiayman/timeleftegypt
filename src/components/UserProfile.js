@@ -215,7 +215,7 @@ export default function UserProfileScreen() {
   if (loading || profileLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#f97316" />
+        <ActivityIndicator size="large" color="#2EDC9A" />
       </View>
     );
   }
@@ -403,14 +403,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 10,
   },
   banner: {
-    backgroundColor: '#e7f2ff',
+    backgroundColor: '#E0F2FE',
     borderWidth: 1,
-    borderColor: '#c7dcf8',
-    color: '#1f4b8f',
+    borderColor: '#BAE6FD',
+    color: '#0369A1',
     borderRadius: 10,
     paddingVertical: 9,
     paddingHorizontal: 12,
@@ -420,61 +420,61 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#fdba74',
-    backgroundColor: '#ffffff',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     marginBottom: 12,
   },
   cardTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 8,
   },
   label: {
     fontSize: 14,
-    color: '#7c2d12',
+    color: '#1F2937',
     fontWeight: '600',
     marginBottom: 6,
     marginTop: 8,
   },
   helperText: {
     fontSize: 13,
-    color: '#9a3412',
+    color: '#1F2937',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#9a3412',
-    backgroundColor: '#ffffff',
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
   },
   readOnlyField: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#F3F4F6',
   },
   readOnlyText: {
-    color: '#9a3412',
+    color: '#1F2937',
     fontSize: 14,
   },
   selectorField: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   selectorText: {
-    color: '#9a3412',
+    color: '#1F2937',
     fontSize: 14,
   },
   textarea: {
@@ -491,31 +491,31 @@ const styles = StyleSheet.create({
     width: '48%',
     minHeight: 88,
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#FAFAF7',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    boxShadow: '0px 6px 16px rgba(249, 115, 22, 0.08)',
+    boxShadow: '0px 6px 16px rgba(46, 220, 154, 0.08)',
   },
   interestCardActive: {
-    borderColor: '#f97316',
-    backgroundColor: '#ffedd5',
+    borderColor: '#2EDC9A',
+    backgroundColor: '#F0FDF4',
   },
   interestIcon: {
     fontSize: 22,
     marginBottom: 8,
   },
   interestText: {
-    color: '#7c2d12',
+    color: '#1F2937',
     fontWeight: '700',
     fontSize: 14,
     lineHeight: 18,
   },
   interestTextActive: {
-    color: '#c2410c',
+    color: '#2EDC9A',
   },
   genderRow: {
     flexDirection: 'row',
@@ -525,26 +525,26 @@ const styles = StyleSheet.create({
   choiceButton: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
     paddingVertical: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   choiceButtonActive: {
-    borderColor: '#f97316',
-    backgroundColor: '#ffedd5',
+    borderColor: '#2EDC9A',
+    backgroundColor: '#F0FDF4',
   },
   choiceText: {
     textAlign: 'center',
-    color: '#7c2d12',
+    color: '#1F2937',
     fontWeight: '600',
   },
   choiceTextActive: {
-    color: '#f97316',
+    color: '#2EDC9A',
   },
   modalScreen: {
     flex: 1,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#FAFAF7',
     padding: 16,
   },
   modalHeader: {
@@ -556,10 +556,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#9a3412',
+    color: '#1F2937',
   },
   modalClose: {
-    color: '#ea580c',
+    color: '#2EDC9A',
     fontWeight: '700',
   },
   modalListContent: {
@@ -568,53 +568,53 @@ const styles = StyleSheet.create({
   },
   listRow: {
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 8,
   },
   listRowActive: {
-    borderColor: '#f97316',
-    backgroundColor: '#ffedd5',
+    borderColor: '#2EDC9A',
+    backgroundColor: '#F0FDF4',
   },
   listRowText: {
-    color: '#7c2d12',
+    color: '#1F2937',
     fontWeight: '600',
   },
   listRowTextActive: {
-    color: '#f97316',
+    color: '#2EDC9A',
   },
   emptyText: {
-    color: '#7c2d12',
+    color: '#1F2937',
     fontSize: 14,
     paddingTop: 12,
   },
   primaryButton: {
-    backgroundColor: '#f97316',
+    backgroundColor: '#2EDC9A',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: '#fff1e6',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#fdba74',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
   },
   secondaryButtonText: {
-    color: '#9a3412',
+    color: '#1F2937',
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   },
   ghostButtonText: {
     textAlign: 'center',
-    color: '#1f56bd',
+    color: '#0EA5E9',
     fontWeight: '600',
   },
   disabled: {

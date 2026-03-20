@@ -128,7 +128,7 @@ export default function AdminPanelScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#f97316" />
+        <ActivityIndicator size="large" color="#2EDC9A" />
       </View>
     );
   }
@@ -193,23 +193,23 @@ export default function AdminPanelScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: 16, paddingBottom: 14 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 26, fontWeight: '700', color: '#9a3412', marginBottom: 4 },
-  sub: { fontSize: 13, color: '#5b6e8a', marginBottom: 10 },
+  title: { fontSize: 26, fontWeight: '700', color: '#1F2937', marginBottom: 4 },
+  sub: { fontSize: 13, color: '#6B7280', marginBottom: 10 },
   tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  tab: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#fff' },
-  tabActive: { borderColor: '#f97316', backgroundColor: '#ffedd5' },
-  tabText: { color: '#7c2d12', fontWeight: '600', fontSize: 12 },
-  tabTextActive: { color: '#f97316' },
+  tab: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#fff' },
+  tabActive: { borderColor: '#2EDC9A', backgroundColor: '#F0FDF4' },
+  tabText: { color: '#1F2937', fontWeight: '600', fontSize: 12 },
+  tabTextActive: { color: '#2EDC9A' },
   list: { paddingBottom: 8, gap: 10 },
-  rowCard: { borderWidth: 1, borderColor: '#fdba74', borderRadius: 12, backgroundColor: '#fff', padding: 12 },
-  rowName: { fontSize: 15, fontWeight: '700', color: '#9a3412', marginBottom: 4 },
-  rowMeta: { fontSize: 13, color: '#3f5471', marginBottom: 3 },
+  rowCard: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: '#fff', padding: 12 },
+  rowName: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 4 },
+  rowMeta: { fontSize: 13, color: '#4B5563', marginBottom: 3 },
   rowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  primaryButton: { flex: 1, backgroundColor: '#f97316', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  primaryButton: { flex: 1, backgroundColor: '#2EDC9A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
   primaryButtonText: { color: '#fff', textAlign: 'center', fontWeight: '700', fontSize: 13 },
-  secondaryButton: { flex: 1, backgroundColor: '#fff1e6', borderWidth: 1, borderColor: '#fdba74', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
-  secondaryButtonText: { color: '#9a3412', textAlign: 'center', fontWeight: '600', fontSize: 13 },
-  dangerButton: { flex: 1, backgroundColor: '#fbe9e8', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
-  dangerButtonText: { color: '#8f1f1a', textAlign: 'center', fontWeight: '700', fontSize: 13 },
-  empty: { color: '#9a3412', fontSize: 14, marginTop: 8 },
+  secondaryButton: { flex: 1, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  secondaryButtonText: { color: '#1F2937', textAlign: 'center', fontWeight: '600', fontSize: 13 },
+  dangerButton: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginTop: 8 },
+  dangerButtonText: { color: '#7F1D1D', textAlign: 'center', fontWeight: '700', fontSize: 13 },
+  empty: { color: '#1F2937', fontSize: 14, marginTop: 8 },
 });

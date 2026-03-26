@@ -54,6 +54,11 @@ const toTimeValue = (dateObj) => {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
+/**
+ * Returns a default new-event form object.
+ * address and mapUrl are intentionally omitted from creation —
+ * they are entered per venue-group after the shuffler runs.
+ */
 const makeDefaultNewEvent = () => {
   const now = new Date();
   return {

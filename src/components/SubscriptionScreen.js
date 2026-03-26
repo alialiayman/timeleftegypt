@@ -163,7 +163,13 @@ export default function SubscriptionScreen({ onBack }) {
   };
 
   const handleSubscribe = () => {
-    // TODO: Wire payment integration here (Stripe, Paymob, etc.)
+    // TODO: Integrate payment processor before going live.
+    // Required steps:
+    //   1. Choose a provider (Stripe, Paymob, Fawry, etc.)
+    //   2. Create a checkout session on your backend with: planKey, userId, price, currency
+    //   3. Pass the checkout URL/session to a payment sheet or WebView
+    //   4. On completion/webhook, write subscription record to Firestore: users/{uid}/subscriptions
+    //   5. Update user status and subscription expiry date
     Alert.alert(
       'Coming soon',
       'Payment integration is not yet active. Your selected plan has been noted.',

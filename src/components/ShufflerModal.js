@@ -15,6 +15,10 @@ import { addDoc, collection, doc, getDoc, getDocs, query, updateDoc, where } fro
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNativeApp } from '../contexts/NativeAppContext';
 
+// NOTE: The OpenAI API key is read from environment variables as required by the feature spec.
+// For production, move AI-powered grouping to a secure backend Cloud Function to avoid
+// bundling the key in the client. The client should call your backend endpoint instead of
+// calling OpenAI directly.
 const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY || process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
 
 /**

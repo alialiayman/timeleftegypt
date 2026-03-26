@@ -20,7 +20,10 @@ import {
 } from 'firebase/firestore';
 import { useNativeApp } from '../contexts/NativeAppContext';
 
-// Emoji-based rating levels (compact, one row in portrait mode)
+/**
+ * Emoji-based rating levels — compact, fits one row in portrait mode.
+ * score: 1–5 mapped to a sentiment emoji with accessible label.
+ */
 const RATING_LEVELS = [
   { score: 1, emoji: '\uD83D\uDE22', label: 'Did not like', bg: '#FEE2E2', border: '#FCA5A5' },
   { score: 2, emoji: '\uD83D\uDE1E', label: 'Uncomfortable', bg: '#FEF3C7', border: '#FCD34D' },

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -14,6 +16,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNativeApp } from '../contexts/NativeAppContext';
+import SubscriptionScreen from './SubscriptionScreen';
 
 const DIETARY_OPTIONS = [
   { key: '', label: 'No preference' },
@@ -26,6 +29,23 @@ const DIETARY_OPTIONS = [
   { key: 'dairy_free', label: 'Dairy-free' },
   { key: 'nut_allergy', label: 'Nut allergy' },
   { key: 'other', label: 'Other' },
+];
+
+const RELATIONSHIP_OPTIONS = [
+  { key: '', label: 'Prefer not to say' },
+  { key: 'single', label: 'Single' },
+  { key: 'in_a_relationship', label: 'In a relationship' },
+  { key: 'married', label: 'Married' },
+  { key: 'divorced', label: 'Divorced' },
+  { key: 'widowed', label: 'Widowed' },
+];
+
+const CHILDREN_OPTIONS = [
+  { key: '', label: 'Prefer not to say' },
+  { key: 'none', label: 'No children' },
+  { key: '1', label: '1 child' },
+  { key: '2', label: '2 children' },
+  { key: '3+', label: '3+ children' },
 ];
 
 const INTEREST_OPTIONS = [
@@ -152,7 +172,7 @@ function DateColumnPicker({ visible, value, onConfirm, onCancel }) {
   );
 }
 
-export default function UserProfileScreen() {
+export default function UserProfileScreen({ onSignOut }) {
   const { db, currentUser, userProfile, profileLoading, updateUserProfile } = useNativeApp();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,6 +182,7 @@ export default function UserProfileScreen() {
   const [localitySearch, setLocalitySearch] = useState('');
   const [showDietaryModal, setShowDietaryModal] = useState(false);
   const [showDobPicker, setShowDobPicker] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   const [form, setForm] = useState({
     displayName: '',
@@ -175,6 +196,9 @@ export default function UserProfileScreen() {
     dietary: '',
     experience: '',
     interests: [],
+    relationshipStatus: '',
+    children: '',
+    workIndustry: '',
   });
 
   useEffect(() => {
@@ -209,6 +233,9 @@ export default function UserProfileScreen() {
             dietary: data.preferences?.dietary || '',
             experience: data.preferences?.experience || '',
             interests,
+            relationshipStatus: data.relationshipStatus || '',
+            children: data.children || '',
+            workIndustry: data.workIndustry || '',
           });
         } else if (active) {
           setForm((prev) => ({
@@ -342,6 +369,9 @@ export default function UserProfileScreen() {
         gender: form.gender,
         localityId: form.localityId || '',
         localityLabel: form.localityLabel || '',
+        relationshipStatus: form.relationshipStatus || '',
+        children: form.children || '',
+        workIndustry: form.workIndustry.trim(),
         preferences: {
           dietary: form.dietary,
           experience: form.experience,
@@ -365,10 +395,60 @@ export default function UserProfileScreen() {
     );
   }
 
+  const photoUrl = userProfile?.customPhotoUrl || currentUser?.photoURL || userProfile?.photoURL || '';
+  const memberSince = userProfile?.createdAt
+    ? new Date(userProfile.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : 'Unknown';
+  const status = userProfile?.isBlocked ? 'Blocked' : 'Active';
+  const eventsAttended = userProfile?.eventsAttendedCount || 0;
+  const friendsMet = userProfile?.friendsMetCount || 0;
+
+  if (showSubscription) {
+    return (
+      <ScrollView contentContainerStyle={styles.screen}>
+        <SubscriptionScreen onBack={() => setShowSubscription(false)} />
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <Text style={styles.title}>Profile</Text>
       {message ? <Text style={styles.banner}>{message}</Text> : null}
+
+      {/* Profile header: photo + stats */}
+      <View style={styles.profileHeader}>
+        <View style={styles.avatarWrap}>
+          {photoUrl ? (
+            <Image source={{ uri: photoUrl }} style={styles.avatarImg} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarPlaceholderText}>
+                {(form.displayName || 'U')[0].toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.statsWrap}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{eventsAttended}</Text>
+            <Text style={styles.statLabel}>Events</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{friendsMet}</Text>
+            <Text style={styles.statLabel}>Friends</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <View style={[styles.statusBadge, status === 'Active' ? styles.statusActive : styles.statusBlocked]}>
+              <Text style={styles.statusText}>{status}</Text>
+            </View>
+            <Text style={styles.statLabel}>Status</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={styles.memberSince}>Member since {memberSince}</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Display Name</Text>
@@ -450,6 +530,44 @@ export default function UserProfileScreen() {
             <Text style={[styles.choiceText, form.gender === 'female' && styles.choiceTextActive]}>Female</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.label}>Relationship Status</Text>
+        <View style={styles.chipRow}>
+          {RELATIONSHIP_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              style={[styles.choiceChip, form.relationshipStatus === opt.key && styles.choiceChipActive]}
+              onPress={() => setForm((p) => ({ ...p, relationshipStatus: opt.key }))}
+            >
+              <Text style={[styles.choiceChipText, form.relationshipStatus === opt.key && styles.choiceChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Children</Text>
+        <View style={styles.chipRow}>
+          {CHILDREN_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              style={[styles.choiceChip, form.children === opt.key && styles.choiceChipActive]}
+              onPress={() => setForm((p) => ({ ...p, children: opt.key }))}
+            >
+              <Text style={[styles.choiceChipText, form.children === opt.key && styles.choiceChipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Work Industry</Text>
+        <TextInput
+          style={styles.input}
+          value={form.workIndustry}
+          onChangeText={(v) => setForm((p) => ({ ...p, workIndustry: v }))}
+          placeholder="e.g. Technology, Healthcare, Finance"
+        />
       </View>
 
       <View style={styles.card}>
@@ -506,6 +624,36 @@ export default function UserProfileScreen() {
       <Pressable style={[styles.primaryButton, saving && styles.disabled]} onPress={saveProfile} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
       </Pressable>
+
+      {/* Subscription section */}
+      <Pressable style={styles.subscriptionBanner} onPress={() => setShowSubscription(true)}>
+        <MaterialCommunityIcons name="crown-outline" size={22} color="#7C3AED" />
+        <View style={styles.subscriptionBannerText}>
+          <Text style={styles.subscriptionBannerTitle}>Subscription Plans</Text>
+          <Text style={styles.subscriptionBannerSub}>View plans, weekly pricing, and promo codes</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+      </Pressable>
+
+      {/* Logout + links */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Account</Text>
+
+        <Pressable style={styles.dangerButton} onPress={onSignOut}>
+          <MaterialCommunityIcons name="logout" size={18} color="#DC2626" style={{ marginRight: 8 }} />
+          <Text style={styles.dangerButtonText}>Sign Out</Text>
+        </Pressable>
+
+        <View style={styles.legalRow}>
+          <Pressable onPress={() => Linking.openURL('https://timeleftegypt.firebaseapp.com/privacy-policy')}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </Pressable>
+          <Text style={styles.legalSep}> · </Text>
+          <Pressable onPress={() => Linking.openURL('https://timeleftegypt.firebaseapp.com/terms-of-service')}>
+            <Text style={styles.legalLink}>Terms of Service</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <Modal visible={showLocalityModal} animationType="slide" onRequestClose={() => setShowLocalityModal(false)}>
         <View style={styles.modalScreen}>
@@ -842,5 +990,167 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.6,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  avatarWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  avatarImg: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  avatarPlaceholder: {
+    width: 72,
+    height: 72,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPlaceholderText: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#5B21B6',
+  },
+  statsWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#E5E7EB',
+  },
+  statusBadge: {
+    borderRadius: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  statusActive: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusBlocked: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  memberSince: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 16,
+    marginLeft: 2,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  choiceChip: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  choiceChipActive: {
+    borderColor: '#2EDC9A',
+    backgroundColor: '#ECFDF5',
+  },
+  choiceChipText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  choiceChipTextActive: {
+    color: '#065F46',
+    fontWeight: '700',
+  },
+  subscriptionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 14,
+    backgroundColor: '#F5F3FF',
+    padding: 14,
+    marginBottom: 12,
+  },
+  subscriptionBannerText: {
+    flex: 1,
+  },
+  subscriptionBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4C1D95',
+    marginBottom: 2,
+  },
+  subscriptionBannerSub: {
+    fontSize: 12,
+    color: '#7C3AED',
+  },
+  dangerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  dangerButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  legalLink: {
+    fontSize: 13,
+    color: '#6B7280',
+    textDecorationLine: 'underline',
+  },
+  legalSep: {
+    fontSize: 13,
+    color: '#D1D5DB',
   },
 });

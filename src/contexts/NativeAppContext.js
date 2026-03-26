@@ -96,6 +96,23 @@ export function NativeAppProvider({ auth, db, children }) {
             ? profilePatch.isBlocked
             : existing.isBlocked || false,
         isAnonymous: false,
+        // Extended profile fields — fall back to existing if not provided
+        status: existing.status || 'active',
+        eventsAttendedCount: existing.eventsAttendedCount || 0,
+        friendsMetCount: existing.friendsMetCount || 0,
+        relationshipStatus:
+          profilePatch.relationshipStatus !== undefined
+            ? profilePatch.relationshipStatus
+            : existing.relationshipStatus || '',
+        children:
+          profilePatch.children !== undefined
+            ? profilePatch.children
+            : existing.children || '',
+        workIndustry:
+          profilePatch.workIndustry !== undefined
+            ? profilePatch.workIndustry
+            : existing.workIndustry || '',
+        customPhotoUrl: existing.customPhotoUrl || '',
         lastUpdated: new Date().toISOString(),
         createdAt: existing.createdAt || new Date().toISOString(),
       };

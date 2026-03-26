@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -24,6 +25,7 @@ import {
 import { useNativeApp } from '../contexts/NativeAppContext';
 
 const EMPTY_FORM = { country: '', city: '', area: '', adminIds: [] };
+const EMPTY_PRICING = { price1Month: '', price3Month: '', price6Month: '', currency: 'EGP', promoCode: '', promoDiscount: '' };
 
 function UserCheck({ item, selected, onToggle }) {
   return (
@@ -35,7 +37,7 @@ function UserCheck({ item, selected, onToggle }) {
 }
 
 export default function SuperAdminPanelScreen() {
-  const { db } = useNativeApp();
+  const { db, currentUser } = useNativeApp();
   const [localities, setLocalities] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,15 @@ export default function SuperAdminPanelScreen() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  // Subscription pricing state
+  const [pricing, setPricing] = useState(EMPTY_PRICING);
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingMessage, setPricingMessage] = useState('');
+  // Promo codes management (multiple codes)
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [newPromoCode, setNewPromoCode] = useState('');
+  const [newPromoDiscount, setNewPromoDiscount] = useState('');
 
   useEffect(() => {
     if (!db) return undefined;
@@ -57,6 +68,28 @@ export default function SuperAdminPanelScreen() {
     const unsub2 = onSnapshot(q2, (snap) => {
       setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
+
+    // Load subscription pricing
+    const loadPricing = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'subscriptionPricing'));
+        if (snap.exists()) {
+          const data = snap.data();
+          setPricing({
+            price1Month: String(data.price1Month || ''),
+            price3Month: String(data.price3Month || ''),
+            price6Month: String(data.price6Month || ''),
+            currency: data.currency || 'EGP',
+          });
+          setPromoCodes(Array.isArray(data.promoCodes) ? data.promoCodes : []);
+        }
+      } catch (err) {
+        console.error('Load pricing failed:', err);
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+    loadPricing();
 
     return () => {
       unsub1();
@@ -184,6 +217,60 @@ export default function SuperAdminPanelScreen() {
     }
   };
 
+  const savePricing = async () => {
+    const p1 = Number(pricing.price1Month);
+    const p3 = Number(pricing.price3Month);
+    const p6 = Number(pricing.price6Month);
+    if (isNaN(p1) || p1 < 0 || isNaN(p3) || p3 < 0 || isNaN(p6) || p6 < 0) {
+      Alert.alert('Invalid', 'Prices must be valid numbers >= 0.');
+      return;
+    }
+    setPricingSaving(true);
+    try {
+      await setDoc(
+        doc(db, 'settings', 'subscriptionPricing'),
+        {
+          price1Month: p1,
+          price3Month: p3,
+          price6Month: p6,
+          currency: pricing.currency || 'EGP',
+          promoCodes,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUser?.uid || '',
+        },
+        { merge: true }
+      );
+      setPricingMessage('Pricing saved.');
+    } catch (err) {
+      console.error('Save pricing failed:', err);
+      setPricingMessage('Could not save pricing.');
+    } finally {
+      setPricingSaving(false);
+      setTimeout(() => setPricingMessage(''), 2500);
+    }
+  };
+
+  const addPromoCode = () => {
+    const code = newPromoCode.trim();
+    const discount = Number(newPromoDiscount);
+    if (!code) { Alert.alert('Invalid', 'Enter a promo code.'); return; }
+    if (isNaN(discount) || discount < 0 || discount > 100) {
+      Alert.alert('Invalid', 'Discount must be between 0 and 100.');
+      return;
+    }
+    if (promoCodes.some((pc) => pc.code.toLowerCase() === code.toLowerCase())) {
+      Alert.alert('Duplicate', 'This promo code already exists.');
+      return;
+    }
+    setPromoCodes((prev) => [...prev, { code, discount }]);
+    setNewPromoCode('');
+    setNewPromoDiscount('');
+  };
+
+  const removePromoCode = (code) => {
+    setPromoCodes((prev) => prev.filter((pc) => pc.code !== code));
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -265,6 +352,111 @@ export default function SuperAdminPanelScreen() {
           );
         })}
       </View>
+
+      {/* Subscription Pricing Section */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>💳 Subscription Pricing</Text>
+        {pricingMessage ? <Text style={styles.pricingMessage}>{pricingMessage}</Text> : null}
+        {pricingLoading ? (
+          <ActivityIndicator size="small" color="#2EDC9A" />
+        ) : (
+          <>
+            <Text style={styles.label}>1 Month Price</Text>
+            <View style={styles.priceInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={pricing.price1Month}
+                onChangeText={(v) => setPricing((p) => ({ ...p, price1Month: v }))}
+                keyboardType="decimal-pad"
+                placeholder="0"
+              />
+              <TextInput
+                style={[styles.input, styles.currencyInput]}
+                value={pricing.currency}
+                onChangeText={(v) => setPricing((p) => ({ ...p, currency: v }))}
+                placeholder="EGP"
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <Text style={styles.label}>3 Month Price</Text>
+            <TextInput
+              style={styles.input}
+              value={pricing.price3Month}
+              onChangeText={(v) => setPricing((p) => ({ ...p, price3Month: v }))}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+
+            <Text style={styles.label}>6 Month Price</Text>
+            <TextInput
+              style={styles.input}
+              value={pricing.price6Month}
+              onChangeText={(v) => setPricing((p) => ({ ...p, price6Month: v }))}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+
+            <Pressable
+              style={[styles.primaryButton, pricingSaving && styles.disabled]}
+              onPress={savePricing}
+              disabled={pricingSaving}
+            >
+              <Text style={styles.primaryButtonText}>{pricingSaving ? 'Saving...' : 'Save Pricing'}</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+
+      {/* Promo Codes Section */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🎟️ Promo Codes</Text>
+
+        {/* Existing promo codes */}
+        {promoCodes.length === 0 ? (
+          <Text style={styles.empty}>No promo codes yet.</Text>
+        ) : (
+          promoCodes.map((pc) => (
+            <View key={pc.code} style={styles.promoRow}>
+              <Text style={styles.promoCode}>{pc.code}</Text>
+              <Text style={styles.promoDiscount}>{pc.discount}% off</Text>
+              <Pressable style={styles.promoRemove} onPress={() => removePromoCode(pc.code)}>
+                <Text style={styles.promoRemoveText}>Remove</Text>
+              </Pressable>
+            </View>
+          ))
+        )}
+
+        {/* Add new promo code */}
+        <Text style={styles.label}>Add Promo Code</Text>
+        <TextInput
+          style={styles.input}
+          value={newPromoCode}
+          onChangeText={setNewPromoCode}
+          placeholder="SUMMER2025"
+          autoCapitalize="characters"
+          autoCorrect={false}
+        />
+        <Text style={styles.label}>Discount % (0–100)</Text>
+        <TextInput
+          style={styles.input}
+          value={newPromoDiscount}
+          onChangeText={setNewPromoDiscount}
+          keyboardType="number-pad"
+          placeholder="e.g. 20"
+        />
+        <Pressable style={styles.primaryButton} onPress={addPromoCode}>
+          <Text style={styles.primaryButtonText}>Add Code</Text>
+        </Pressable>
+
+        {promoCodes.length > 0 && (
+          <Pressable style={styles.secondaryButton} onPress={savePricing} disabled={pricingSaving}>
+            <Text style={styles.secondaryButtonText}>
+              {pricingSaving ? 'Saving...' : 'Save All Promo Codes'}
+            </Text>
+          </Pressable>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -298,4 +490,12 @@ const styles = StyleSheet.create({
   rowButtons: { flexDirection: 'row', gap: 8 },
   empty: { fontSize: 14, color: '#1F2937' },
   disabled: { opacity: 0.6 },
+  priceInputRow: { flexDirection: 'row', gap: 8 },
+  currencyInput: { width: 70 },
+  pricingMessage: { fontSize: 13, color: '#065F46', fontWeight: '700', backgroundColor: '#D1FAE5', borderRadius: 8, padding: 8, marginBottom: 8 },
+  promoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#F9FAFB' },
+  promoCode: { flex: 1, fontSize: 14, fontWeight: '700', color: '#1F2937' },
+  promoDiscount: { fontSize: 13, color: '#6B7280' },
+  promoRemove: { backgroundColor: '#FEE2E2', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8 },
+  promoRemoveText: { color: '#DC2626', fontWeight: '700', fontSize: 12 },
 });

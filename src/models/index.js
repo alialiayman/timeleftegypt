@@ -109,6 +109,14 @@ export const createUser = (overrides = {}) => ({
   localityLabel: '',
   createdAt: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
+  // Extended profile fields
+  status: 'active',            // 'active' | 'blocked'
+  eventsAttendedCount: 0,
+  friendsMetCount: 0,
+  relationshipStatus: '',      // 'single' | 'in_a_relationship' | 'married' | 'prefer_not_to_say'
+  children: '',                // 'none' | '1' | '2' | '3+' | 'prefer_not_to_say'
+  workIndustry: '',
+  customPhotoUrl: '',          // user-uploaded photo (supplements Google photoURL)
   ...overrides,
 });
 
@@ -325,5 +333,97 @@ export const createContactPermission = (overrides = {}) => ({
   status: 'pending',
   createdAt: new Date().toISOString(),
   reviewedAt: null,
+  ...overrides,
+});
+
+/**
+ * Notification document (Firestore: notifications/{notifId})
+ * @typedef {Object} Notification
+ * @property {string} id
+ * @property {string} userId - Recipient user ID
+ * @property {'connect_request' | 'venue_revealed' | 'general'} type
+ * @property {string} [fromUserId] - Sender user ID (if applicable)
+ * @property {string} [eventId] - Related event ID (if applicable)
+ * @property {string} message
+ * @property {boolean} read
+ * @property {string} createdAt
+ */
+export const createNotification = (overrides = {}) => ({
+  id: '',
+  userId: '',
+  type: 'general',
+  fromUserId: '',
+  eventId: '',
+  message: '',
+  read: false,
+  createdAt: new Date().toISOString(),
+  ...overrides,
+});
+
+/**
+ * ConnectRequest document (Firestore: connectRequests/{reqId})
+ * @typedef {Object} ConnectRequest
+ * @property {string} id
+ * @property {string} requesterId
+ * @property {string} requesterName
+ * @property {string} targetUserId
+ * @property {'pending' | 'approved' | 'rejected'} status
+ * @property {string} message
+ * @property {string} createdAt
+ * @property {string} [respondedAt]
+ */
+export const createConnectRequest = (overrides = {}) => ({
+  id: '',
+  requesterId: '',
+  requesterName: '',
+  targetUserId: '',
+  status: 'pending',
+  message: '',
+  createdAt: new Date().toISOString(),
+  respondedAt: null,
+  ...overrides,
+});
+
+/**
+ * SubscriptionPricing document (Firestore: settings/subscriptionPricing)
+ * @typedef {Object} SubscriptionPricing
+ * @property {number} price1Month
+ * @property {number} price3Month
+ * @property {number} price6Month
+ * @property {string} currency
+ * @property {Array<{code: string, discount: number}>} promoCodes
+ * @property {string} updatedAt
+ * @property {string} updatedBy
+ */
+export const createSubscriptionPricing = (overrides = {}) => ({
+  price1Month: 0,
+  price3Month: 0,
+  price6Month: 0,
+  currency: 'EGP',
+  promoCodes: [],
+  updatedAt: new Date().toISOString(),
+  updatedBy: '',
+  ...overrides,
+});
+
+/**
+ * VenueGroup — embedded in event.venueGroups after shuffler runs
+ * @typedef {Object} VenueGroup
+ * @property {string} groupId
+ * @property {string} groupName
+ * @property {string[]} attendeeIds
+ * @property {string} venueName
+ * @property {string} venueAddress
+ * @property {string} mapUrl
+ * @property {boolean} locationRevealed
+ */
+export const createVenueGroup = (overrides = {}) => ({
+  groupId: '',
+  groupName: '',
+  attendeeIds: [],
+  venueName: '',
+  venueAddress: '',
+  mapUrl: '',
+  locationRevealed: false,
   ...overrides,
 });

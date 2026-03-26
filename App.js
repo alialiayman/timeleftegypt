@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Linking,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -67,6 +70,116 @@ const navTheme = {
   },
 };
 
+// Animated blob for the auth screen background
+function AnimatedBlob({ color, size, top, left, right, bottom, delay = 0 }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, { toValue: 1, duration: 4500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 4500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+    return () => anim.stopAnimation();
+  }, [anim, delay]);
+
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] });
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] });
+
+  return (
+    <Animated.View
+      style={[
+        authStyles.blob,
+        { backgroundColor: color, width: size, height: size, borderRadius: size / 2 },
+        top !== undefined && { top },
+        left !== undefined && { left },
+        right !== undefined && { right },
+        bottom !== undefined && { bottom },
+        { transform: [{ scale }], opacity },
+      ]}
+    />
+  );
+}
+
+const LANGUAGES = [
+  { code: 'en', label: 'EN' },
+  { code: 'ar', label: 'AR' },
+];
+
+function AuthScreen({ request, isSigningIn, onSignIn }) {
+  const [langIndex, setLangIndex] = useState(0);
+  const fadeIn = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeIn, { toValue: 1, duration: 900, useNativeDriver: true }).start();
+  }, [fadeIn]);
+
+  const toggleLanguage = () => setLangIndex((i) => (i + 1) % LANGUAGES.length);
+  const currentLang = LANGUAGES[langIndex];
+
+  const openPrivacy = () => Linking.openURL('https://timeleftegypt.firebaseapp.com/privacy-policy');
+  const openTerms = () => Linking.openURL('https://timeleftegypt.firebaseapp.com/terms-of-service');
+
+  return (
+    <View style={authStyles.container}>
+      {/* Animated background blobs */}
+      <AnimatedBlob color="#F97316" size={280} top={-60} left={-80} delay={0} />
+      <AnimatedBlob color="#FBBF24" size={220} top={100} right={-70} delay={800} />
+      <AnimatedBlob color="#EC4899" size={180} top={250} left={30} delay={1600} />
+      <AnimatedBlob color="#8B5CF6" size={150} bottom={220} right={-40} delay={400} />
+      <AnimatedBlob color="#2EDC9A" size={200} bottom={80} left={-60} delay={1200} />
+
+      {/* Dark overlay */}
+      <View style={authStyles.overlay} />
+
+      {/* Language switcher */}
+      <Pressable style={authStyles.langButton} onPress={toggleLanguage}>
+        <MaterialCommunityIcons name="web" size={20} color="#FFFFFF" />
+        <Text style={authStyles.langText}>{currentLang.label}</Text>
+      </Pressable>
+
+      {/* Content */}
+      <Animated.View style={[authStyles.content, { opacity: fadeIn }]}>
+        {/* People meeting emojis */}
+        <View style={authStyles.emojiRow}>
+          <Text style={authStyles.heroEmoji}>🤝</Text>
+          <Text style={authStyles.heroEmoji}>☕</Text>
+          <Text style={authStyles.heroEmoji}>🥂</Text>
+          <Text style={authStyles.heroEmoji}>🎉</Text>
+        </View>
+
+        <Text style={authStyles.headline}>Make new friends{'\n'}face-to-face</Text>
+        <Text style={authStyles.subheadline}>
+          Discover curated local events, meet amazing people, and turn plans into real memories.
+        </Text>
+
+        <Pressable
+          style={[authStyles.googleButton, (!request || isSigningIn) && authStyles.buttonDisabled]}
+          onPress={onSignIn}
+          disabled={!request || isSigningIn}
+        >
+          <MaterialCommunityIcons name="google" size={20} color="#1F2937" style={authStyles.googleIcon} />
+          <Text style={authStyles.googleButtonText}>
+            {isSigningIn ? 'Signing in...' : 'Continue with Google'}
+          </Text>
+        </Pressable>
+
+        <View style={authStyles.legalRow}>
+          <Pressable onPress={openPrivacy}>
+            <Text style={authStyles.legalLink}>Privacy Policy</Text>
+          </Pressable>
+          <Text style={authStyles.legalSep}> · </Text>
+          <Pressable onPress={openTerms}>
+            <Text style={authStyles.legalLink}>Terms of Service</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 function AuthShell({ children }) {
   return (
     <KeyboardAvoidingView
@@ -77,34 +190,6 @@ function AuthShell({ children }) {
         {children}
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function AuthScreen({ request, isSigningIn, onSignIn }) {
-  return (
-    <AuthShell>
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>TimeLeft Gatherly</Text>
-        <Text style={styles.title}>Meet Better. Live More.</Text>
-        <Text style={styles.subtitle}>Join curated local events, discover your people, and turn plans into memories.</Text>
-        <View style={styles.valueList}>
-          <Text style={styles.cardItem}>Curated social events in your city</Text>
-          <Text style={styles.cardItem}>Smart matching based on your profile</Text>
-          <Text style={styles.cardItem}>Fast booking with real-time updates</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.hintText}>Use your Google account to securely continue.</Text>
-      </View>
-      <Pressable
-        style={[styles.primaryButton, (!request || isSigningIn) && styles.buttonDisabled]}
-        onPress={onSignIn}
-        disabled={!request || isSigningIn}
-      >
-        <Text style={styles.primaryButtonText}>{isSigningIn ? 'Signing in...' : 'Login with Google'}</Text>
-      </Pressable>
-    </AuthShell>
   );
 }
 
@@ -356,10 +441,10 @@ function AppContent() {
 
   const tabs = useMemo(() => {
     const baseTabs = [
-      { name: 'Dashboard', icon: 'view-dashboard-outline', component: DashboardScreen, props: { onSignOut: signOutNative } },
+      { name: 'Dashboard', icon: 'view-dashboard-outline', component: DashboardScreen, props: {} },
       { name: 'Events', icon: 'calendar-star', component: EventsScreen, props: {} },
       { name: 'Friends', icon: 'account-group-outline', component: FriendsScreen, props: {} },
-      { name: 'Profile', icon: 'account-circle-outline', component: UserProfileScreen, props: {} },
+      { name: 'Profile', icon: 'account-circle-outline', component: UserProfileScreen, props: { onSignOut: signOutNative } },
     ];
 
     const overflowTabs = [];
@@ -389,8 +474,8 @@ function AppContent() {
 
   if (flow === 'guest') {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={authStyles.safeArea}>
+        <StatusBar barStyle="light-content" />
         <AuthScreen request={request} isSigningIn={isSigningIn} onSignIn={signInWithGoogle} />
       </SafeAreaView>
     );
@@ -620,5 +705,108 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontSize: 15,
     fontWeight: '600',
+  },
+});
+
+// Auth screen styles (dark/lively onboarding design)
+const authStyles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#1C0A05',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#1C0A05',
+    overflow: 'hidden',
+  },
+  blob: {
+    position: 'absolute',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(12, 4, 0, 0.55)',
+  },
+  langButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    zIndex: 10,
+  },
+  langText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+  },
+  emojiRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 24,
+  },
+  heroEmoji: {
+    fontSize: 36,
+  },
+  headline: {
+    fontSize: 42,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 50,
+    marginBottom: 14,
+    letterSpacing: -0.5,
+  },
+  subheadline: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.72)',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
+  googleIcon: {
+    marginRight: 2,
+  },
+  googleButtonText: {
+    color: '#1F2937',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  legalLink: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  legalSep: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
   },
 });

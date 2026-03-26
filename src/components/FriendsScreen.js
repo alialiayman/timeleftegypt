@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -17,15 +18,18 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNativeApp } from '../contexts/NativeAppContext';
 
+/**
+ * Emoji-based rating levels — compact, fits one row in portrait mode.
+ * score: 1–5 mapped to a sentiment emoji with accessible label.
+ */
 const RATING_LEVELS = [
-  { score: 1, icon: 'emoticon-sad-outline', label: 'I did not like this person', bg: '#FEE2E2', border: '#FCA5A5' },
-  { score: 2, icon: 'emoticon-frown-outline', label: 'I did not enjoy this interaction', bg: '#FEF3C7', border: '#FCD34D' },
-  { score: 3, icon: 'emoticon-neutral-outline', label: 'I felt neutral about this person', bg: '#E5E7EB', border: '#D1D5DB' },
-  { score: 4, icon: 'emoticon-happy-outline', label: 'I liked this person', bg: '#D1FAE5', border: '#86EFAC' },
-  { score: 5, icon: 'emoticon-excited-outline', label: 'I really liked this person', bg: '#A7F3D0', border: '#2EDC9A' },
+  { score: 1, emoji: '\uD83D\uDE22', label: 'Did not like', bg: '#FEE2E2', border: '#FCA5A5' },
+  { score: 2, emoji: '\uD83D\uDE1E', label: 'Uncomfortable', bg: '#FEF3C7', border: '#FCD34D' },
+  { score: 3, emoji: '\uD83D\uDE10', label: 'Neutral',       bg: '#E5E7EB', border: '#D1D5DB' },
+  { score: 4, emoji: '\uD83D\uDE0A', label: 'Liked',         bg: '#D1FAE5', border: '#86EFAC' },
+  { score: 5, emoji: '\uD83D\uDE0D', label: 'Loved it',      bg: '#A7F3D0', border: '#2EDC9A' },
 ];
 
 const LEGACY_VALUE_BY_SCORE = {
@@ -37,11 +41,13 @@ const LEGACY_VALUE_BY_SCORE = {
 };
 
 export default function FriendsScreen() {
-  const { db, currentUser } = useNativeApp();
+  const { db, currentUser, userProfile } = useNativeApp();
   const [loading, setLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState(null);
+  const [connectingUserId, setConnectingUserId] = useState(null);
   const [metPeople, setMetPeople] = useState([]);
   const [ratingsByUserId, setRatingsByUserId] = useState({});
+  const [sentRequests, setSentRequests] = useState(new Set());
 
   useEffect(() => {
     let alive = true;
@@ -133,6 +139,8 @@ export default function FriendsScreen() {
           people.push({
             userId: uid,
             displayName: userData.displayName || userData.name || userData.email || 'Unknown user',
+            city: userData.city || '',
+            localityLabel: userData.localityLabel || '',
             photoURL: userData.photoURL || '',
             sharedEventsCount: metMap[uid].sharedEventIds.size,
             lastMetAt: metMap[uid].lastMetAt,
@@ -169,8 +177,15 @@ export default function FriendsScreen() {
           }
         });
 
+        // Load already-sent connect requests
+        const connectSnap = await getDocs(
+          query(collection(db, 'connectRequests'), where('requesterId', '==', currentUser.uid))
+        );
+        const alreadySent = new Set(connectSnap.docs.map((d) => d.data().targetUserId).filter(Boolean));
+
         if (alive) {
           setMetPeople(people);
+          setSentRequests(alreadySent);
           const mapped = {};
           people.forEach((p) => {
             if (latestRatings[p.userId]?.score) {
@@ -237,51 +252,113 @@ export default function FriendsScreen() {
     }
   };
 
+  const sendConnectRequest = async (person) => {
+    if (!db || !currentUser?.uid || !person?.userId) return;
+    if (sentRequests.has(person.userId)) {
+      Alert.alert('Already sent', 'You already sent a connect request to this person.');
+      return;
+    }
+
+    setConnectingUserId(person.userId);
+    try {
+      const requesterName =
+        userProfile?.displayName || currentUser?.displayName || currentUser?.email || 'Someone';
+
+      // Create a connect request record
+      await addDoc(collection(db, 'connectRequests'), {
+        requesterId: currentUser.uid,
+        requesterName,
+        targetUserId: person.userId,
+        status: 'pending',
+        message: `${requesterName} would like to connect with you.`,
+        createdAt: new Date().toISOString(),
+        respondedAt: null,
+      });
+
+      // Send a notification to the target user
+      await addDoc(collection(db, 'notifications'), {
+        userId: person.userId,
+        type: 'connect_request',
+        fromUserId: currentUser.uid,
+        eventId: person.lastEventId || '',
+        message: `${requesterName} sent you a connect request. They met you at "${person.lastEventTitle}".`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+
+      setSentRequests((prev) => new Set([...prev, person.userId]));
+      Alert.alert('Request sent!', `Your connect request was sent to ${person.displayName}.`);
+    } catch (error) {
+      console.error('Send connect request failed:', error);
+      Alert.alert('Error', 'Could not send connect request. Please try again.');
+    } finally {
+      setConnectingUserId(null);
+    }
+  };
+
   const renderItem = ({ item }) => {
     const selectedScore = ratingsByUserId[item.userId] || 0;
     const isSaving = savingUserId === item.userId;
-    const selectedLevel = RATING_LEVELS.find((level) => level.score === selectedScore);
+    const isConnecting = connectingUserId === item.userId;
+    const alreadySent = sentRequests.has(item.userId);
+    const locationLabel = item.localityLabel || item.city || '';
+
     return (
       <View style={styles.card}>
+        {/* User row */}
         <View style={styles.userRow}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(item.displayName || 'U')[0].toUpperCase()}</Text>
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{item.displayName}</Text>
-            <Text style={styles.userMeta}>Met in {item.sharedEventsCount} event{item.sharedEventsCount > 1 ? 's' : ''}</Text>
-            <Text style={styles.userMeta}>Last: {item.lastEventTitle}</Text>
+            {locationLabel ? (
+              <Text style={styles.userMeta}>
+                {'\uD83D\uDCCD'} {locationLabel}
+              </Text>
+            ) : null}
+            <Text style={styles.userMeta}>
+              Met in {item.sharedEventsCount} event{item.sharedEventsCount !== 1 ? 's' : ''}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.ratingRow}>
-          {RATING_LEVELS.map((level) => {
-            const active = selectedScore === level.score;
-            return (
-              <Pressable
-                key={level.score}
-                style={[
-                  styles.ratingButton,
-                  { backgroundColor: level.bg, borderColor: level.border },
-                  active && styles.ratingButtonActive,
-                ]}
-                onPress={() => saveRating(item, level.score)}
-                disabled={isSaving}
-              >
-                <MaterialCommunityIcons
-                  name={level.icon}
-                  size={22}
-                  color={active ? '#0B5D40' : '#6B7280'}
-                />
-                <Text style={[styles.ratingLabel, active && styles.ratingLabelActive]}>{level.score}</Text>
-              </Pressable>
-            );
-          })}
+        {/* Compact emoji rating row */}
+        <View style={styles.ratingSection}>
+          <Text style={styles.rateLabel}>Rate:</Text>
+          <View style={styles.ratingRow}>
+            {RATING_LEVELS.map((level) => {
+              const active = selectedScore === level.score;
+              return (
+                <Pressable
+                  key={level.score}
+                  style={[
+                    styles.emojiButton,
+                    { backgroundColor: level.bg, borderColor: active ? level.border : 'transparent' },
+                    active && styles.emojiButtonActive,
+                  ]}
+                  onPress={() => saveRating(item, level.score)}
+                  disabled={isSaving}
+                  accessibilityLabel={level.label}
+                >
+                  <Text style={styles.emojiText}>{level.emoji}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
-        {selectedLevel ? (
-          <Text style={styles.ratingConfirmation}>{selectedLevel.label}</Text>
-        ) : null}
+        {/* Request to Connect button */}
+        <Pressable
+          style={[styles.connectButton, (isConnecting || alreadySent) && styles.connectButtonSent]}
+          onPress={() => sendConnectRequest(item)}
+          disabled={isConnecting || alreadySent}
+        >
+          <Text style={styles.connectButtonEmoji}>{alreadySent ? '\u2705' : '\uD83E\uDD1D'}</Text>
+          <Text style={[styles.connectButtonText, alreadySent && styles.connectButtonTextSent]}>
+            {isConnecting ? 'Sending...' : alreadySent ? 'Request Sent' : 'Request to Connect'}
+          </Text>
+        </Pressable>
       </View>
     );
   };
@@ -302,6 +379,7 @@ export default function FriendsScreen() {
       {metPeople.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>No previous event connections yet.</Text>
+          <Text style={styles.emptyHint}>Once you attend events, the people you meet will appear here.</Text>
         </View>
       ) : (
         <FlatList
@@ -332,6 +410,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 4,
+    marginTop: 16,
   },
   subtitle: {
     fontSize: 14,
@@ -345,27 +424,28 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
-    padding: 12,
+    padding: 14,
   },
   userRow: {
     flexDirection: 'row',
     gap: 10,
     alignItems: 'center',
+    marginBottom: 12,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#D1FAE5',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#065F46',
+    color: '#5B21B6',
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 18,
   },
   userInfo: {
     flex: 1,
@@ -380,59 +460,82 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  ratingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  rateLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
   ratingRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
+    gap: 6,
+    flex: 1,
   },
-  ratingButton: {
-    width: '18%',
-    minWidth: 58,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 8,
+  emojiButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ratingButtonActive: {
-    borderColor: '#2EDC9A',
-    transform: [{ scale: 1.06 }],
+  emojiButtonActive: {
+    transform: [{ scale: 1.12 }],
   },
-  ratingEmoji: {
+  emojiText: {
     fontSize: 20,
-    marginBottom: 2,
   },
-  ratingLabel: {
-    fontSize: 12,
+  connectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFFBEB',
+  },
+  connectButtonSent: {
+    borderColor: '#D1FAE5',
+    backgroundColor: '#F0FDF4',
+  },
+  connectButtonEmoji: {
+    fontSize: 18,
+  },
+  connectButtonText: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#92400E',
   },
-  ratingLabelActive: {
-    color: '#0B5D40',
-  },
-  ratingConfirmation: {
-    fontSize: 12,
+  connectButtonTextSent: {
     color: '#065F46',
-    fontWeight: '700',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginTop: 10,
   },
   emptyCard: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
-    padding: 14,
+    padding: 20,
     backgroundColor: '#FFFFFF',
+    alignItems: 'center',
   },
   emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

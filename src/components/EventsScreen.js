@@ -15,6 +15,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
   increment,
   onSnapshot,
   query,
@@ -23,6 +24,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { useNativeApp } from '../contexts/NativeAppContext';
+import ShufflerModal from './ShufflerModal';
 
 const EVENT_TYPES = [
   { key: 'dinner', label: 'Dinner' },
@@ -59,8 +61,8 @@ const makeDefaultNewEvent = () => {
     description: '',
     type: 'dinner',
     locality: '',
-    address: '',
-    mapUrl: '',
+    // address and mapUrl are intentionally removed from creation;
+    // they are entered per-group after the shuffler runs.
     date: toDateValue(now),
     time: toTimeValue(now),
     price: '0',
@@ -95,13 +97,6 @@ function EventCard({
         {isCreator && (
           <View style={styles.creatorActionIcons}>
             <Pressable
-              style={[styles.iconButton, styles.iconButtonTeal]}
-              onPress={() => onRunAlgorithm(event)}
-              disabled={busy}
-            >
-              <Text style={styles.iconButtonText}>⚙️</Text>
-            </Pressable>
-            <Pressable
               style={[styles.iconButton, styles.iconButtonGreen]}
               onPress={() => onEdit(event)}
               disabled={busy}
@@ -122,10 +117,20 @@ function EventCard({
       <Text style={styles.eventMeta}>Type: {event.type}</Text>
       <Text style={styles.eventMeta}>Date: {eventDate}</Text>
       <Text style={styles.eventMeta}>Locality: {event.locality || '-'}</Text>
-      <Text style={styles.eventMeta}>Address: {event.address || '-'}</Text>
-      {event.mapUrl ? <Text style={styles.eventMeta}>Map: {event.mapUrl}</Text> : null}
       <Text style={styles.eventMeta}>Price: {priceLabel}</Text>
       {event.description ? <Text style={styles.eventDescription}>{event.description}</Text> : null}
+
+      {/* Shuffle button — prominent, organizer-only */}
+      {isCreator && (
+        <Pressable
+          style={[styles.shuffleButton, busy && styles.buttonDisabled]}
+          onPress={() => onRunAlgorithm(event)}
+          disabled={busy}
+        >
+          <Text style={styles.shuffleButtonEmoji}>🔀</Text>
+          <Text style={styles.shuffleButtonText}>Shuffle & Assign Venues</Text>
+        </Pressable>
+      )}
 
       {!isCreator && (
         isBooked ? (
@@ -160,6 +165,11 @@ export default function EventsScreen() {
   const [editBusy, setEditBusy] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingEventId, setDeletingEventId] = useState(null);
+  // Shuffler state
+  const [showShuffler, setShowShuffler] = useState(false);
+  const [shufflingEvent, setShufflingEvent] = useState(null);
+  // Previous similar events for suggestions
+  const [prevSimilarEvents, setPrevSimilarEvents] = useState([]);
 
   useEffect(() => {
     if (!db) return undefined;
@@ -239,6 +249,33 @@ export default function EventsScreen() {
     setNewEvent((prev) => ({ ...prev, locality: organizerLocalityLabel }));
   }, [organizerLocalityLabel]);
 
+  // Load previous events of the same type when event type changes
+  useEffect(() => {
+    const loadPrev = async () => {
+      if (!db || !currentUser?.uid || !newEvent.type) {
+        setPrevSimilarEvents([]);
+        return;
+      }
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'events'),
+            where('createdBy', '==', currentUser.uid),
+            where('type', '==', newEvent.type)
+          )
+        );
+        const list = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => ((a.createdAt || '') > (b.createdAt || '') ? -1 : 1))
+          .slice(0, 3);
+        setPrevSimilarEvents(list);
+      } catch {
+        setPrevSimilarEvents([]);
+      }
+    };
+    loadPrev();
+  }, [db, currentUser?.uid, newEvent.type]);
+
   const dateOptions = useMemo(() => {
     const base = new Date();
     const list = [];
@@ -279,10 +316,6 @@ export default function EventsScreen() {
       setMessage('Organizer locality is required before creating events.');
       return;
     }
-    if (newEvent.mapUrl && !/^https?:\/\//i.test(newEvent.mapUrl.trim())) {
-      setMessage('Map URL must start with http:// or https://');
-      return;
-    }
 
     setCreateBusy(true);
     try {
@@ -299,9 +332,7 @@ export default function EventsScreen() {
         locality: organizerLocalityLabel,
         localityId: organizerLocalityId,
         locationName: organizerLocalityLabel,
-        address: newEvent.address.trim(),
-        mapUrl: newEvent.mapUrl.trim(),
-        googleMapsLink: newEvent.mapUrl.trim(),
+        // address and mapUrl are set per-group after the shuffler runs
         dateTime: when.toISOString(),
         price: Number(newEvent.price || 0),
         currency: newEvent.currency || 'EGP',
@@ -404,8 +435,6 @@ export default function EventsScreen() {
       description: event.description || '',
       type: event.type || 'dinner',
       locality: event.locality || organizerLocalityLabel,
-      address: event.address || '',
-      mapUrl: event.mapUrl || '',
       date: toDateValue(eventDateTime),
       time: toTimeValue(eventDateTime),
       price: String(event.price || 0),
@@ -418,10 +447,6 @@ export default function EventsScreen() {
     if (!db || !editingEvent) return;
     if (!editFormData.title.trim() || !editFormData.date || !editFormData.time) {
       setMessage('Title and date/time are required.');
-      return;
-    }
-    if (editFormData.mapUrl && !/^https?:\/\//i.test(editFormData.mapUrl.trim())) {
-      setMessage('Map URL must start with http:// or https://');
       return;
     }
 
@@ -438,9 +463,6 @@ export default function EventsScreen() {
         title: editFormData.title.trim(),
         description: editFormData.description.trim(),
         type: editFormData.type,
-        address: editFormData.address.trim(),
-        mapUrl: editFormData.mapUrl.trim(),
-        googleMapsLink: editFormData.mapUrl.trim(),
         dateTime: when.toISOString(),
         price: Number(editFormData.price || 0),
         currency: editFormData.currency || 'EGP',
@@ -485,9 +507,8 @@ export default function EventsScreen() {
   };
 
   const handleRunAlgorithm = (event) => {
-    // Placeholder for match algorithm
-    setMessage(`Match algorithm placeholder: Would run for event "${event.title}"`);
-    console.log('Running match algorithm for event:', event.id);
+    setShufflingEvent(event);
+    setShowShuffler(true);
   };
 
   const renderItem = ({ item }) => {
@@ -566,6 +587,35 @@ export default function EventsScreen() {
               ))}
             </View>
 
+            {/* Previous similar events suggestions */}
+            {prevSimilarEvents.length > 0 && (
+              <View style={styles.prevEventsSection}>
+                <Text style={styles.prevEventsTitle}>💡 Previous {newEvent.type} events</Text>
+                {prevSimilarEvents.map((prev) => (
+                  <Pressable
+                    key={prev.id}
+                    style={styles.prevEventChip}
+                    onPress={() => {
+                      setNewEvent((p) => ({
+                        ...p,
+                        title: prev.title || p.title,
+                        description: prev.description || p.description,
+                        price: String(prev.price || 0),
+                        currency: prev.currency || 'EGP',
+                      }));
+                      setMessage('Prefilled from previous event.');
+                    }}
+                  >
+                    <Text style={styles.prevEventChipTitle}>{prev.title || 'Untitled'}</Text>
+                    <Text style={styles.prevEventChipMeta}>
+                      {prev.dateTime ? new Date(prev.dateTime).toLocaleDateString() : '-'}
+                    </Text>
+                    <Text style={styles.prevEventChipAction}>Tap to prefill →</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
             <Text style={styles.inputLabel}>Title</Text>
             <TextInput
               style={styles.input}
@@ -588,23 +638,6 @@ export default function EventsScreen() {
               <Text style={styles.readOnlyText}>{newEvent.locality || 'No organizer locality assigned'}</Text>
             </View>
 
-            <Text style={styles.inputLabel}>Address</Text>
-            <TextInput
-              style={styles.input}
-              value={newEvent.address}
-              onChangeText={(v) => setNewEvent((prev) => ({ ...prev, address: v }))}
-              placeholder="Street, building, venue details"
-            />
-
-            <Text style={styles.inputLabel}>Google Maps URL</Text>
-            <TextInput
-              style={styles.input}
-              value={newEvent.mapUrl}
-              onChangeText={(v) => setNewEvent((prev) => ({ ...prev, mapUrl: v }))}
-              placeholder="https://maps.google.com/..."
-              autoCapitalize="none"
-            />
-
             <Text style={styles.inputLabel}>Date</Text>
             <Pressable style={styles.pickerField} onPress={() => setShowDatePicker(true)}>
               <Text style={styles.pickerText}>{newEvent.date}</Text>
@@ -623,6 +656,12 @@ export default function EventsScreen() {
               keyboardType="decimal-pad"
               placeholder="0"
             />
+
+            <View style={styles.addrNote}>
+              <Text style={styles.addrNoteText}>
+                📍 Address and map URL will be entered per group after the Shuffler runs.
+              </Text>
+            </View>
 
             <View style={styles.createModalButtons}>
               <Pressable
@@ -742,23 +781,6 @@ export default function EventsScreen() {
               <Text style={styles.readOnlyText}>{editFormData.locality || 'No locality assigned'}</Text>
             </View>
 
-            <Text style={styles.inputLabel}>Address</Text>
-            <TextInput
-              style={styles.input}
-              value={editFormData.address}
-              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, address: v }))}
-              placeholder="Street, building, venue details"
-            />
-
-            <Text style={styles.inputLabel}>Google Maps URL</Text>
-            <TextInput
-              style={styles.input}
-              value={editFormData.mapUrl}
-              onChangeText={(v) => setEditFormData((prev) => ({ ...prev, mapUrl: v }))}
-              placeholder="https://maps.google.com/..."
-              autoCapitalize="none"
-            />
-
             <Text style={styles.inputLabel}>Date</Text>
             <Pressable style={styles.pickerField} onPress={() => setShowDatePicker(true)}>
               <Text style={styles.pickerText}>{editFormData.date}</Text>
@@ -777,6 +799,12 @@ export default function EventsScreen() {
               keyboardType="decimal-pad"
               placeholder="0"
             />
+
+            <View style={styles.addrNote}>
+              <Text style={styles.addrNoteText}>
+                📍 Address and map URL are set per group after the Shuffler runs.
+              </Text>
+            </View>
 
             <View style={styles.editModalButtons}>
               <Pressable
@@ -820,6 +848,14 @@ export default function EventsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Shuffler modal — organizer assigns venues after grouping */}
+      <ShufflerModal
+        visible={showShuffler}
+        event={shufflingEvent}
+        onClose={() => { setShowShuffler(false); setShufflingEvent(null); }}
+        onSaved={() => setMessage('Groups saved and attendees notified.')}
+      />
     </SafeAreaView>
   );
 }
@@ -1171,5 +1207,76 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  shuffleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1F2937',
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginTop: 10,
+  },
+  shuffleButtonEmoji: {
+    fontSize: 20,
+  },
+  shuffleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  prevEventsSection: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  prevEventsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 8,
+  },
+  prevEventChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+  },
+  prevEventChipTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  prevEventChipMeta: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  prevEventChipAction: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2EDC9A',
+  },
+  addrNote: {
+    backgroundColor: '#FEF9C3',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  addrNoteText: {
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 20,
   },
 });
